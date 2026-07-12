@@ -3,12 +3,19 @@ import csv
 DATA_DIR = Path("data/raw/transfermarkt")
 clubs_csv_path = DATA_DIR / "clubs.csv"
 games_csv_path = DATA_DIR / "games.csv"
-with open (clubs_csv_path, mode="r",encoding="utf-8") as file:
-    reader=csv.DictReader(file)
-    sayac=0
-    for satir in reader:
-        print(satir)
-        sayac+=1
-        if sayac== 3:
-            break
+club_games_csv_path = DATA_DIR / "club_games.csv"
+valid_game_ids = []
+
+def get_league_matches(comp_id,season):
+    matches=[]
+    with open(games_csv_path,mode="r", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        for satir in reader:
+            if satir['competition_id'] == comp_id and satir['season'] == str(season):
+                matches.append(satir)
+                
+    return matches
+
+gb1_2012_matches = get_league_matches('GB1', '2012')
+print(f"GB1 2012 sezonunda bulunan maç sayısı: {len(gb1_2012_matches)}")
 
