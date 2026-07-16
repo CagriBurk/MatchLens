@@ -57,3 +57,4 @@ dkms.conf
 # csv files
 *.csv
 data/
+.swp
