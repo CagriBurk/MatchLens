@@ -11,17 +11,30 @@ conn = sqlite3.connect(DB_PATH)
 competitions_df = csv_reader = pd.read_csv(competitions_csv_path)
 
 competitions_df.to_sql("competitions",conn,if_exists="replace",index=False)
-query= """
-SELECT game_id, competition_id, season, date, home_club_id, away_club_id,home_club_goals, away_club_goals
-FROM games
-WHERE competition_id='GB1' AND season =2012
-ORDER BY date ASC
-LIMIT 10;
+query = """
+SELECT
+    cg.game_id,
+    g.date,
+    g.competition_id,
+    g.season,
+    cg.club_id,
+    cg.opponent_id,
+    cg.own_goals,
+    cg.opponent_goals,
+    cg.hosting,
+    cg.is_win
+FROM club_games AS cg
+JOIN games AS g
+    ON cg.game_id = g.game_id
+WHERE g.competition_id = 'GB1'
+  AND g.season = 2012
+ORDER BY g.date ASC;
 """
 result = conn.execute(query)
 
-tables = result.fetchall()
-print(tables)
+team_match_records_df= pd.read_sql_query(query,conn)
 
+print(team_match_records_df.head())
+print(team_match_records_df.shape)
 
 conn.close() 
