@@ -8,7 +8,7 @@ DB_PATH = Path("database/matchlens.db")
 conn = sqlite3.connect(DB_PATH)
 
 query = """
-SELECT g.game_id, g.date, g.home_club_id, g.away_club_id, g.home_club_goals, g.away_club_goals, home_form.points, home_form.btts_rate, away_form.btts_rate, away_form.points
+SELECT g.game_id, g.date, g.home_club_id, g.away_club_id, g.home_club_goals, g.away_club_goals, home_form.points AS home_points, home_form.btts_rate AS home_btts_rate, away_form.btts_rate AS away_btts_rate, away_form.points AS away_points
 FROM games AS g
 JOIN team_form_snapshots AS home_form
   ON g.game_id = home_form.game_id
@@ -24,7 +24,7 @@ WHERE g.competition_id = 'GB1'
 team_match_records_df = pd.read_sql_query(query, conn)
 
 team_match_records_df['date'] = pd.to_datetime(team_match_records_df['date'])
-
+"""
 def get_team_form_stats(target_club_id, data_table, current_date):
     target_team_games= data_table[data_table['club_id']==target_club_id]
 
@@ -102,10 +102,8 @@ def generate_snapshot_database(merged_dataframe, db_connection):
 generate_snapshot_database(team_match_records_df,conn)
 control_df = pd.read_sql_query("SELECT * FROM team_form_snapshots WHERE matches_played=10 LIMIT 5;", conn)
 print(control_df)
-
+"""
 
 feature_df= pd.read_sql_query(query, conn)
-print(feature_df.head(10))
-print(feature_df.shape)
 
 conn.close()
