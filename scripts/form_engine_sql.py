@@ -1,3 +1,4 @@
+from stat import FILE_ATTRIBUTE_READONLY
 import pandas as pd
 import sqlite3
 from pathlib import Path
@@ -8,7 +9,7 @@ DB_PATH = Path("database/matchlens.db")
 conn = sqlite3.connect(DB_PATH)
 
 query = """
-SELECT g.game_id, g.date, g.home_club_id, g.away_club_id, g.home_club_goals, g.away_club_goals, home_form.points AS home_points, home_form.btts_rate AS home_btts_rate, away_form.btts_rate AS away_btts_rate, away_form.points AS away_points
+SELECT g.game_id, g.date, g.home_club_id, g.away_club_id, g.home_club_goals, g.away_club_goals, home_form.points AS home_points, home_form.btts_rate AS home_btts_rate, away_form.btts_rate AS away_btts_rate, away_form.points AS away_points, home_form.total_over_2_5 AS home_over_2_5_rate, away_form.total_over_2_5 AS away_over_2_5_rate
 FROM games AS g
 JOIN team_form_snapshots AS home_form
   ON g.game_id = home_form.game_id
@@ -105,5 +106,14 @@ print(control_df)
 """
 
 feature_df= pd.read_sql_query(query, conn)
+
+feature_df['form_advantage']= feature_df['home_points'] - feature_df['away_points']
+feature_df['btts_tendency'] = (feature_df['home_btts_rate']+feature_df['away_btts_rate']) / 2
+feature_df['over_2_5_tendency'] = (feature_df['home_over_2_5_rate'] + feature_df['away_over_2_5_rate']) / 2
+
+feature_df['target_btts'] = ((feature_df['home_club_goals'] > 0) & (feature_df['away_club_goals'] > 0)).astype(int)
+feature_df['target_over_2_5'] = ((feature_df['home_club_goals'] + feature_df['away_club_goals']) > 2.5).astype(int)
+
+feature_df.to_sql("match_features", conn, if_exists="replace", index=False)
 
 conn.close()
