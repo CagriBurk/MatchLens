@@ -58,3 +58,11 @@ dkms.conf
 *.csv
 data/
 .swp
+
+
+
+cutted
+requirements.txt
+.vscode/settings.json
+api/__pycache__/main.cpython-314.pyc
+database/matchlens.db
