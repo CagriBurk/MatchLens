@@ -1,4 +1,3 @@
-from stat import FILE_ATTRIBUTE_READONLY
 import pandas as pd
 import sqlite3
 from pathlib import Path
