@@ -66,3 +66,6 @@ requirements.txt
 .vscode/settings.json
 api/__pycache__/main.cpython-314.pyc
 database/matchlens.db
+design.md
+streamlit_app.py
+__pycache__/streamlit_app.cpython-311.pyc
