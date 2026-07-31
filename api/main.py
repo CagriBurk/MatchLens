@@ -62,4 +62,4 @@ def get_match_analysis(game_id: int):
     adv_score = match_data["form_advantage"]
     analysis_result = analyze_match(match_data)
     return analysis_result
-     
+    
