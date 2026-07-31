@@ -71,3 +71,4 @@ streamlit_app.py
 __pycache__/streamlit_app.cpython-311.pyc
 .agents/skills/developing-with-streamlit
 api/services/__pycache__/analysis_engine.cpython-314.pyc
+.env
