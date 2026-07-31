@@ -1,7 +1,7 @@
 from fastapi import FastAPI,HTTPException, status
 import sqlite3
 import pandas as pd
-
+from api.services.analysis_engine import analyze_match
 
 
 app = FastAPI(title="Matchlens API")
@@ -60,17 +60,6 @@ def get_match_analysis(game_id: int):
         raise HTTPException(status_code=404,detail="Analysis not found")
     match_data = df.to_dict(orient="records")[0]
     adv_score = match_data["form_advantage"]
-
-    if adv_score > 3:
-        match_comment = "Ev sahibi takım net favori."
-    elif adv_score < -3:
-        match_comment = "Deplasman takımı daha formda."
-    else:
-        match_comment = "İki takım denk güçte, riskli maç."
-    return {
-        "game_id": match_data["game_id"],
-        "home_club_id": match_data["home_club_id"],
-        "away_club_id": match_data["away_club_id"],
-        "form_advantage_score": adv_score,
-        "analysis": match_comment
-    }
+    analysis_result = analyze_match(match_data)
+    return analysis_result
+     
