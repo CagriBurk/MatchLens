@@ -165,17 +165,36 @@ def fetch_season_fixtures(league_id: int, season: int) -> dict:
     return response.json()
 
 if __name__ == "__main__":
-    target_league = 203
+    from db_manager import init_db, save_matches
+    import time  # Bekleme süresi eklemek için standart kütüphane
+
+    init_db()
+
     target_season = 2024
     
-    data = fetch_season_fixtures(target_league, target_season)
+    # 39: Premier Lig, 140: La Liga, 135: Serie A, 78: Bundesliga, 61: Ligue 1, 203: Süper Lig
+    target_leagues = [39, 140, 135, 78, 61, 203]
     
-    print("API Errors:", data.get("errors"))
-    
-    fixtures = data.get("response", [])
-    print(f"Total matches found for League {target_league} in {target_season} season: {len(fixtures)}")
-    
-    if fixtures:
-        for raw_fixture in fixtures[:3]:
-            parsed = parse_fixture(raw_fixture)
-            print(f"{parsed['date']} | {parsed['home_team_name']} vs {parsed['away_team_name']}")
+    print("Toplu veri çekimi başlıyor...\n" + "-"*30)
+
+    for league_id in target_leagues:
+        print(f"{target_season} sezonu, {league_id} ID'li lig için API'ye gidiliyor...")
+        
+        data = fetch_season_fixtures(league_id, target_season)
+        raw_fixtures = data.get("response", [])
+        
+        if not raw_fixtures:
+            print(f"Uyarı: {league_id} ID'li lig için hiç maç bulunamadı!")
+        else:
+            parsed_matches = []
+            for raw in raw_fixtures:
+                parsed = parse_fixture(raw)
+                parsed_matches.append(parsed)
+            
+            save_matches(parsed_matches)
+            print(f"Başarılı! Lig {league_id} için {len(parsed_matches)} maç kaydedildi.")
+        
+        # API sınırlarına takılmamak için diğer lige geçmeden önce 2 saniye bekle
+        time.sleep(2)
+        
+    print("-" * 30 + "\nTüm liglerin veritabanına aktarımı tamamlandı!")

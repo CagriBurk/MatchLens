@@ -74,3 +74,4 @@ api/services/__pycache__/analysis_engine.cpython-314.pyc
 .env
 __pycache__/api_client.cpython-311.pyc
 matchlens.db
+data_pipeline/__pycache__/db_manager.cpython-314.pyc
