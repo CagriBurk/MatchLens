@@ -75,3 +75,10 @@ api/services/__pycache__/analysis_engine.cpython-314.pyc
 __pycache__/api_client.cpython-311.pyc
 matchlens.db
 data_pipeline/__pycache__/db_manager.cpython-314.pyc
+docs/00_master_context_prompt.md
+docs/01_project_overview.md
+docs/02_current_state.md
+docs/03_roadmap.md
+docs/04_daily_log.md
+docs/05_project_structure.md
+.agents/AGENTS.md
