@@ -82,3 +82,5 @@ docs/03_roadmap.md
 docs/04_daily_log.md
 docs/05_project_structure.md
 .agents/AGENTS.md
+downloaded_files/driver_fixing.lock
+.gitignore
