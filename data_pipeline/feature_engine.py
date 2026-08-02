@@ -141,10 +141,19 @@ def build_tactical_features(conn):
         team_tactics['rest_days'] = team_tactics.groupby('team')['date'].diff().dt.days
         team_tactics['rest_days'] = team_tactics['rest_days'].fillna(7)
         print(team_tactics[team_tactics['team'] == 'Arsenal'][['date', 'rest_days', 'rolling_3_xg_for']].head(5))
-        team_tactics['diff_xg_rolling_3'] = team_tactics['xg_for'] - team_tactics['rolling_3_xg_for']
-        team_tactics['diff_ppda_rolling_3'] = team_tactics['ppda'] - team_tactics['rolling_3_ppda']
-        team_tactics['diff_deep_rolling_3'] = team_tactics['deep_completions'] - team_tactics['rolling_3_deep_completions']
+        team_tactics['prev_xg_for'] = team_tactics.groupby('team')['xg_for'].shift(1)
+        team_tactics['prev_ppda'] = team_tactics.groupby('team')['ppda'].shift(1)
+        team_tactics['prev_deep'] = team_tactics.groupby('team')['deep_completions'].shift(1)
+        team_tactics['diff_xg_rolling_3'] = team_tactics['prev_xg_for'] - team_tactics['rolling_3_xg_for']
+        team_tactics['diff_ppda_rolling_3'] = team_tactics['prev_ppda'] - team_tactics['rolling_3_ppda']
+        team_tactics['diff_deep_rolling_3'] = team_tactics['prev_deep'] - team_tactics['rolling_3_deep_completions']
+        
+        print("\n--- TAKTİKSEL SAPMA (MOMENTUM) EKLENMİŞ HALİ (İLK 5 SATIR) ---")
         print(team_tactics[team_tactics['team'] == 'Arsenal'][['date', 'diff_xg_rolling_3', 'diff_ppda_rolling_3', 'diff_deep_rolling_3']].head(5))
+
+        # ML İçin Hazırlanan Veriyi SQLite'a Kaydetme
+        team_tactics.to_sql("team_tactical_form", conn, if_exists="replace", index=False)
+        print("\n[BAŞARILI] 'team_tactical_form' tablosu veritabanına kaydedildi!")
     except Exception as e:
         print(f"Error in build_tactical_features: {e}")
 

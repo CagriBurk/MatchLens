@@ -84,3 +84,4 @@ docs/05_project_structure.md
 .agents/AGENTS.md
 downloaded_files/driver_fixing.lock
 .gitignore
+data_pipeline/__pycache__/elo_mapper.cpython-314.pyc
