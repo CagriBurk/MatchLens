@@ -107,11 +107,54 @@ def build_match_features(conn):
     except Exception as e:
         print(f"Error in build_match_features: {e}")
 
+def build_tactical_features(conn):
+    print("Building tactical form features (Rolling Averages)")
+    
+    # 1. Understat verisini çekiyoruz
+    query = "SELECT date, home_team, away_team, home_xg, away_xg, home_ppda, away_ppda, home_deep_completions, away_deep_completions FROM tactical_match_stats"
+    try:
+        tactical_df = pd.read_sql_query(query, conn)
+        tactical_df['date'] = pd.to_datetime(tactical_df['date'])
+        
+        # 2. Veriyi "Ev Sahibi" ve "Deplasman" yerine, "Takım" ve "Rakip" olarak ikiye ayırıp alt alta ekleyeceğiz (Melt işlemi gibi)
+        home_stats = tactical_df[['date', 'home_team', 'home_xg', 'away_xg', 'home_ppda', 'home_deep_completions']].copy()
+        home_stats.columns = ['date', 'team', 'xg_for', 'xg_against', 'ppda', 'deep_completions']
+        
+        away_stats = tactical_df[['date', 'away_team', 'away_xg', 'home_xg', 'away_ppda', 'away_deep_completions']].copy()
+        away_stats.columns = ['date', 'team', 'xg_for', 'xg_against', 'ppda', 'deep_completions']
+        
+        # Takım bazlı tek bir zaman çizelgesi (DataFrame) oluşturduk
+        team_tactics = pd.concat([home_stats, away_stats]).sort_values(by=['team', 'date'])
+        
+        print("\n--- TAKIM ODAKLI HAM VERİ (İLK 5 SATIR) ---")
+        print(team_tactics.head())
+        cols_to_roll = ['xg_for', 'xg_against', 'ppda', 'deep_completions']
+        for col in cols_to_roll:
+            team_tactics[f'rolling_3_{col}'] = team_tactics.groupby('team')[col].transform(
+                lambda x: x.rolling(window=3, min_periods=1).mean().shift(1)
+            )
+        for col in cols_to_roll:
+            team_tactics[f'rolling_5_{col}'] = team_tactics.groupby('team')[col].transform(
+                lambda x: x.rolling(window=5, min_periods=1).mean().shift(1)
+            )
+        print(team_tactics[team_tactics['team'] == 'Arsenal'][['date', 'xg_for', 'rolling_3_xg_for', 'rolling_5_ppda']].head(6))
+        team_tactics['rest_days'] = team_tactics.groupby('team')['date'].diff().dt.days
+        team_tactics['rest_days'] = team_tactics['rest_days'].fillna(7)
+        print(team_tactics[team_tactics['team'] == 'Arsenal'][['date', 'rest_days', 'rolling_3_xg_for']].head(5))
+        team_tactics['diff_xg_rolling_3'] = team_tactics['xg_for'] - team_tactics['rolling_3_xg_for']
+        team_tactics['diff_ppda_rolling_3'] = team_tactics['ppda'] - team_tactics['rolling_3_ppda']
+        team_tactics['diff_deep_rolling_3'] = team_tactics['deep_completions'] - team_tactics['rolling_3_deep_completions']
+        print(team_tactics[team_tactics['team'] == 'Arsenal'][['date', 'diff_xg_rolling_3', 'diff_ppda_rolling_3', 'diff_deep_rolling_3']].head(5))
+    except Exception as e:
+        print(f"Error in build_tactical_features: {e}")
+
+
 def run():
     print("Starting Feature Engine")
     conn = sqlite3.connect(DB_PATH)
-    build_team_form_snapshots(conn)
-    build_match_features(conn)
+    #build_team_form_snapshots(conn)
+    #build_match_features(conn)
+    build_tactical_features(conn)
     conn.close()
     print("Feature Engine completed")
 
