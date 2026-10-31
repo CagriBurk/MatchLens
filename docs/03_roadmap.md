@@ -28,7 +28,8 @@
 - [x] `data_pipeline/ingest_espn.py` + `data_pipeline/espn/` (client / parse / leagues). Ham JSON `data/raw/espn/` altında gzip önbellek; biten maçlar bir daha çekilmez.
 - [x] Scoreboard (lig×yıl tek istek): 43.916 maç, 2016-2026, skor + gol/kart dakikaları (`espn_matches`, `espn_match_events`). Own goal yararlanan takıma yazılıyor; skor/olay tutarlılığı %98.1 (`events_consistent` bayrağı; tutarsızlar ağırlıkla bel/den 2016-17, tur 2018/2022).
 - [x] Kapsam ölçümü (lig-sezon başı 15 maç örneklem): İstatistik (korner/şut/faul/kart/topa sahip olma) Top 5 + eng.2 + usa.1'de 2016'dan beri %100; esp.2 2021+, tur.1 2016-18 ve 2024+, bel.1 2024+, den.1 2024+, nor.1 2024+. Bet365 maç öncesi oran (1X2 + gol çizgisi): Top 5 + eng.2 2018+ büyük ölçüde var; bel/tur kısmi; den/nor/esp.2 (2022+) ve usa.1 neredeyse yok.
-- [ ] Tam summary backfill (~42k maç) — arka planda çalışıyor, log: `data/logs/espn_backfill.log`.
+- [ ] Tam summary backfill (~42k maç, ~1.2-1.3 GB) — kotalı internet nedeniyle durduruldu (~2.800 summary önbellekte). Yarın sınırsız Wi-Fi'de devam (bkz. `docs/07_session_handoff.md`).
+- [ ] Kaggle: `adamgbor/club-football-match-data-2000-2025` (~16 MB, football-data aynası + Bet365 + istatistik) ve `archangel0x01/football-odds-movements-2018-2026` (~542 MB, açılış-kapanış ve oran hareketleri) indirilecek.
 - [ ] Günlük güncelleme komutu (bu yılın scoreboard'ları + önümüzdeki 7 günün summary'leri).
 
 ## 🔶 Açık Sorular
