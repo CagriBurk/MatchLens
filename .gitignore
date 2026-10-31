@@ -1,87 +1,15 @@
-# Prerequisites
-*.d
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
 
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
-
-# debug information files
-*.dwo
-
-# csv files
-*.csv
-data/
-.swp
-
-
-
-cutted
-requirements.txt
-.vscode/settings.json
-api/__pycache__/main.cpython-314.pyc
-database/matchlens.db
-design.md
-streamlit_app.py
-__pycache__/streamlit_app.cpython-311.pyc
-.agents/skills/developing-with-streamlit
-api/services/__pycache__/analysis_engine.cpython-314.pyc
 .env
-__pycache__/api_client.cpython-311.pyc
-matchlens.db
-data_pipeline/__pycache__/db_manager.cpython-314.pyc
-docs/00_master_context_prompt.md
-docs/01_project_overview.md
-docs/02_current_state.md
-docs/03_roadmap.md
-docs/04_daily_log.md
-docs/05_project_structure.md
-.agents/AGENTS.md
-downloaded_files/driver_fixing.lock
-.gitignore
-data_pipeline/__pycache__/elo_mapper.cpython-314.pyc
+*.swp
+*.lock
+
+data/
+database/*.db
+_trash/
+.agents/skills/

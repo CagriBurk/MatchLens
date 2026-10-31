@@ -1,30 +1,23 @@
-import os
-import sys
+import argparse
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__line__))))
+from data_pipeline import feature_engine, ingest_elo, ingest_understat, merge_features
 
-from data_pipeline import ingest_historical
-from data_pipeline import ingest_api
-from data_pipeline import team_mapper
-from data_pipeline import feature_engine
+STEPS = {
+    "understat": ingest_understat.run,
+    "elo": ingest_elo.run,
+    "features": feature_engine.run,
+    "merge": merge_features.run,
+}
+
 
 def main():
-    print("Initializing MatchLens Data Pipeline")
+    parser = argparse.ArgumentParser(description="MatchLens data pipeline")
+    parser.add_argument("steps", nargs="*", choices=list(STEPS), default=["features", "merge"])
+    args = parser.parse_args()
+    for step in args.steps:
+        print(f"Running step: {step}")
+        STEPS[step]()
 
-    print("[1/4] Data Ingestion")
-    # ingest_historical.run()
-    # ingest_api.run()
-    print("Ingestion completed")
-
-    print("[2/4] Team Mapping")
-    # team_mapper.run()
-    print("Mapping completed")
-
-    print("[3/4] Feature Engineering")
-    feature_engine.run()
-    print("Feature Engineering completed")
-
-    print("MatchLens Pipeline execution finished successfully")
 
 if __name__ == "__main__":
     main()
