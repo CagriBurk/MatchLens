@@ -39,7 +39,8 @@ Cumartesi sabah 08:00'de açıldığında, o gün oynanacak maçlar için model 
 Plan: ESPN Bet365 + The Odds API (ücretsiz key) birleşimi. Yetmezse API-Football Pro değerlendirilir (Çağrı'ya maliyet sorulacak).
 
 ### FootyStats (Çağrı'nın üyeliği, süresi az, CSV kredisi çok kısıtlı)
-- Elde: EPL 2026/27 league/matches/players/teams/teams2 CSV'leri → `data/raw/footystats/`.
+- Elde (`data/raw/footystats/`): EPL 2026/27 (tüm CSV'ler) + maç CSV'leri: Danimarka 23/24-26/27, Championship 23/24-26/27, Norveç 2024-2026, Segunda 23/24, 24/25, 26/27 (**25/26 eksik**), Süper Lig 23/24-26/27. Belçika ve MLS henüz yok.
+- Kalite kontrolü (1 Kasım): biten maçlarda xG, 1X2/Üst/KG oranları, korner, şut, topa sahip olma ve gol dakikaları ~%98-100 dolu; hakem %60-100 (güncel sezonda boş). Dosyalardaki kolon adı `home_team_name`/`away_team_name` (dokümandaki `team_a_name` değil). Oynanmamış maçlarda da oran + pre-match xG var.
 - **Maç CSV'sinin değeri (66 sütun):** maç xG'si (`team_a_xg`, `team_b_xg`) — Understat'ın olmadığı liglerde (tur/bel/den/nor/esp.2/eng.2/usa) tek xG kaynağı; gol dakikaları, İY skoru, yarı bazlı kartlar, korner, şut, faul, topa sahip olma, hakem; **oranlar: 1X2, Üst 1.5/2.5/3.5/4.5, KG Var/Yok** (KG oranı başka hiçbir kaynağımızda yok); oynanmamış maçlarda da maç öncesi oran ve pre-match xG var.
 - Oranların hangi bahis şirketine ait olduğu belirsiz (muhtemelen piyasa ortalaması) → Bet365 yerine geçmez, KG ve backtest için ek referans.
 - **Scraping yapılmayacak:** ücretli içerik + kredi limiti erişim kısıtlaması, kullanım şartlarına aykırı, hesap kapanma riski. Resmi API (football-data-api.com) ayrı ücretli ürün.
