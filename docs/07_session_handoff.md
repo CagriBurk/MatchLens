@@ -38,6 +38,14 @@ Cumartesi sabah 08:00'de açıldığında, o gün oynanacak maçlar için model 
 
 Plan: ESPN Bet365 + The Odds API (ücretsiz key) birleşimi. Yetmezse API-Football Pro değerlendirilir (Çağrı'ya maliyet sorulacak).
 
+### FootyStats (Çağrı'nın üyeliği, süresi az, CSV kredisi çok kısıtlı)
+- Elde: EPL 2026/27 league/matches/players/teams/teams2 CSV'leri → `data/raw/footystats/`.
+- **Maç CSV'sinin değeri (66 sütun):** maç xG'si (`team_a_xg`, `team_b_xg`) — Understat'ın olmadığı liglerde (tur/bel/den/nor/esp.2/eng.2/usa) tek xG kaynağı; gol dakikaları, İY skoru, yarı bazlı kartlar, korner, şut, faul, topa sahip olma, hakem; **oranlar: 1X2, Üst 1.5/2.5/3.5/4.5, KG Var/Yok** (KG oranı başka hiçbir kaynağımızda yok); oynanmamış maçlarda da maç öncesi oran ve pre-match xG var.
+- Oranların hangi bahis şirketine ait olduğu belirsiz (muhtemelen piyasa ortalaması) → Bet365 yerine geçmez, KG ve backtest için ek referans.
+- **Scraping yapılmayacak:** ücretli içerik + kredi limiti erişim kısıtlaması, kullanım şartlarına aykırı, hesap kapanma riski. Resmi API (football-data-api.com) ayrı ücretli ürün.
+- **Kalan kredi öncelik sırası (sadece "matches" CSV'leri):** son 3-4 sezon için esp.2 → tur.1 → eng.2 → bel.1 → den.1 → nor.1 → usa.1 (xG + KG oranı olmayan ligler). league/teams/players CSV'leri düşük öncelik (aynılarını maç verisinden kendimiz türetiyoruz).
+- Ayrıca `C:\Users\cbura\Downloads\football-events\` (Kaggle "Football Events", ~10k maç, Top 5 lig 2011-2017, 1X2/Alt-Üst/KG oranları) diskte duruyor; eski dönem ek oran verisi olarak kullanılabilir.
+
 ## 4. Mevcut Durum (commit `de73a4c` itibarıyla)
 ### Kod
 - `data_pipeline/config.py`, `db.py`, `team_names.py` (Understat→ClubElo isimleri)
