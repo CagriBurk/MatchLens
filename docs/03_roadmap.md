@@ -19,10 +19,20 @@
 
 **Önemli notlar:** İddaa marjı ~%18-19 (örn. 1.17/5.30/7.00 ve 2.5 Alt/Üst 1.74/1.63). ESPN'deki "Bet 365" ana alanı maç sonu canlı oranı olabilir (sızıntı); sadece `preMatch*` alanları kullanılmalı.
 
-## 🔶 Bekleyen Kararlar
-- [ ] Lig kapsamı: Katmanlı model (geniş taban + Top 5'te taktiksel derinlik) önerildi.
-- [ ] Veri omurgası: ESPN (fikstür+istatistik+dakika) + Understat (xG) + kendi Elo'muz + Nesine (canlı oran) önerildi.
-- [ ] Tarihsel oran kaynağı (Kaggle aynası?) ve Nesine bülteninin günlük arşivlenmesi.
+## ✅ Alınan Kararlar (2026-10-31)
+- **Oran referansı Bet365.** Nesine/İddaa arşivleyici yazılmayacak. Bet365'te karşılığı olan marketlerde (1X2, Çifte Şans, Alt/Üst) model ile oran kıyaslanır; karşılığı olmayan özel marketlerde (İki Yarı 1.5 Üst, İki Yarı KG, 6+ Gol, 0-15 dk gol) oran kıyası yapılmaz, sadece model olasılığı gösterilir.
+- **Veri omurgası ESPN.** Understat yalnızca Top 5 lig için derin katman (xG/PPDA/Deep). Elo'yu kendimiz sonuçlardan hesaplayacağız (repoda daha önce kendi Elo kodu yokmuş, sadece ClubElo çekici vardı; ClubElo şu an çalışmıyor).
+- **Lig listesi (ilk faz, 12 lig):** eng.1, esp.1, ita.1, ger.1, fra.1, tur.1, bel.1, den.1, nor.1, usa.1, eng.2, esp.2. Danimarka 2 ve Norveç 2 ESPN'de yok. Liste `data_pipeline/espn/leagues.py` içinde, genişletmek tek satır (ESPN'de jpn.1, ned.1, por.1, ger.2, ita.2, fra.2, eng.3, sco.1 vb. de var).
+
+## 📌 Aşama 2.5: ESPN Veri Omurgası
+- [x] `data_pipeline/ingest_espn.py` + `data_pipeline/espn/` (client / parse / leagues). Ham JSON `data/raw/espn/` altında gzip önbellek; biten maçlar bir daha çekilmez.
+- [x] Scoreboard (lig×yıl tek istek): 43.916 maç, 2016-2026, skor + gol/kart dakikaları (`espn_matches`, `espn_match_events`). Own goal yararlanan takıma yazılıyor; skor/olay tutarlılığı %98.1 (`events_consistent` bayrağı; tutarsızlar ağırlıkla bel/den 2016-17, tur 2018/2022).
+- [x] Kapsam ölçümü (lig-sezon başı 15 maç örneklem): İstatistik (korner/şut/faul/kart/topa sahip olma) Top 5 + eng.2 + usa.1'de 2016'dan beri %100; esp.2 2021+, tur.1 2016-18 ve 2024+, bel.1 2024+, den.1 2024+, nor.1 2024+. Bet365 maç öncesi oran (1X2 + gol çizgisi): Top 5 + eng.2 2018+ büyük ölçüde var; bel/tur kısmi; den/nor/esp.2 (2022+) ve usa.1 neredeyse yok.
+- [ ] Tam summary backfill (~42k maç) — arka planda çalışıyor, log: `data/logs/espn_backfill.log`.
+- [ ] Günlük güncelleme komutu (bu yılın scoreboard'ları + önümüzdeki 7 günün summary'leri).
+
+## 🔶 Açık Sorular
+- [ ] Tarihsel Bet365 oranı olmayan lig-sezonlarda backtest/oran ikizleri için ek kaynak (Kaggle'daki football-data aynası tek seferlik indirilebilir).
 
 ## 📌 Aşama 1: Veri Pipeline'ının Stabilize Edilmesi (Refactoring) - ✅ TAMAMLANDI
 - [x] `data_pipeline` ve `scripts` altındaki (Pandas ve SQL odaklı) dağınık veri işleme kodlarının incelenmesi. (archive klasörüne taşındı)
