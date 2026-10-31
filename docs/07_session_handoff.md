@@ -20,6 +20,24 @@ Cumartesi sabah 08:00'de açıldığında, o gün oynanacak maçlar için model 
 - **Lig listesi (faz 1):** eng.1, esp.1, ita.1, ger.1, fra.1, tur.1, bel.1, den.1, nor.1, usa.1, eng.2, esp.2 (`data_pipeline/espn/leagues.py`). Danimarka 2 / Norveç 2 ESPN'de yok. Genişletme serbest (jpn.1, ned.1, por.1, ger.2, ita.2, fra.2...).
 - **Katmanlı model:** Tüm liglerde gol/sonuç/şut/korner/kart/Elo/oran tabanı; Top 5'te ek olarak xG katmanı. Eksik feature'lar LightGBM'de NaN olarak kalır; katmanın faydası backtest'te lig bazında ölçülür.
 
+## 3.1. Ürün Kararları (31 Ekim gecesi)
+- **Elle oran girme yok.** Geçmiş oranların hepsi Kaggle'dan (ve bulunabilecek diğer setlerden) çekilecek; güncel oranlar otomatik bir kaynaktan gelecek.
+- **v1 kapsamı = Gol motoru:** 1X2, Çifte Şans, Alt/Üst (1.5/2.5/3.5), KG Var, İY/MS gol marketleri ve özel marketler (İki Yarı 1.5 Üst, İki Yarı KG, 6+ Gol, 0-15 dk gol). Korner/kart motorları ve Oran İkizleri v2'ye.
+- **v1 çıktısı = terminal komutu** (`python -m matchlens.bulletin --date YYYY-MM-DD` gibi): o günün fikstürünü + oranları çeker, model olasılıkları, adil oran, Bet365 oranı, edge/EV ve özel market olasılıklarıyla tablo basar (+ CSV). 5 ekranlı Streamlit projenin son hali, motor oturduktan sonra.
+- Sürümler hızlı çıkacak; öncelik az hata/debugging. Her modül için küçük doğrulama testleri yazılacak.
+- **Hedef: 1 Kasım (Pazar) akşamı ilk canlı deneme.** Pazar maçlarının çoğu o saatte bitmiş olacağı için deneme Pazartesi-Salı fikstürleri + sonraki hafta sonu maçları üzerinde yapılır; Pazar günü oynanan maçlar da "maç öncesi verisiyle tahmin et, sonucu kontrol et" sağlama testi olarak kullanılır.
+
+### Güncel oran kaynağı (erişim testi 1 Kasım)
+| Kaynak | Durum |
+| :--- | :--- |
+| ESPN Bet365 preMatch | ✅ Ücretsiz. Top 5 + eng.2 + usa.1'de güncel maçlar için var, diğer liglerde çoğunlukla yok |
+| API-Football (key `.env`'de, Free plan, 100 istek/gün) | ⚠️ Free plan sadece 2022-2024 sezonlarına izin veriyor → güncel oran yok. Bet365 (id 8) ve Pinnacle (id 4) destekli; Pro plan (ücretli) ile çözülür |
+| The Odds API | ✅ Erişilebilir (401 = key gerekli). Ücretsiz plan 500 kredi/ay. Bet365/Pinnacle'ı hangi bölgede verdiği key alınınca doğrulanacak |
+| Sportmonks / OddsPapi | ✅ Erişilebilir, key gerekli, büyük ölçüde ücretli |
+| Pinnacle guest API, OddsPortal, football-data | ❌ Engelli |
+
+Plan: ESPN Bet365 + The Odds API (ücretsiz key) birleşimi. Yetmezse API-Football Pro değerlendirilir (Çağrı'ya maliyet sorulacak).
+
 ## 4. Mevcut Durum (commit `de73a4c` itibarıyla)
 ### Kod
 - `data_pipeline/config.py`, `db.py`, `team_names.py` (Understat→ClubElo isimleri)
@@ -45,6 +63,7 @@ Cumartesi sabah 08:00'de açıldığında, o gün oynanacak maçlar için model 
 
 ## 5. Yarın İndirilecekler (sınırsız Wi-Fi)
 Önce: Kaggle → Settings → API → "Create New Token" → `kaggle.json` dosyasını `~/.kaggle/kaggle.json` olarak kaydet (`chmod 600`). Sonra `.venv/bin/pip install kaggle`.
+Ayrıca: https://the-odds-api.com adresinden ücretsiz key al, `.env` dosyasına `ODDS_API_KEY=...` olarak ekle.
 
 | # | Ne | Boyut | Komut / Hedef |
 | :--- | :--- | ---: | :--- |
@@ -62,7 +81,11 @@ Cumartesi sabah 08:00'de açıldığında, o gün oynanacak maçlar için model 
 4. `ml_match_dataset`: maç başına tek satır, sızıntısız rolling feature'lar (gol, xG, şut, isabetli şut, korner, kart, faul, İY golleri, dakika dilimleri, Elo, dinlenme günü, piyasa olasılığı).
 5. Motor 1: Dixon-Coles / Poisson (λ_H, λ_A ve yarı bazlı λ_1H, λ_2H) → skor matrisi → 1X2, Alt/Üst, KG, özel marketler.
 6. Walk-forward backtest: Brier/log-loss kalibrasyon + Bet365/Pinnacle kapanışına karşı ROI. Model piyasayı yenmeden diğer motorlara geçilmez.
-7. Günlük güncelleme komutu + Cumartesi bülteni çıktısı, sonra korner/kart motorları, Oran İkizleri (k-NN), UI.
+7. Güncel oran entegrasyonu (ESPN Bet365 + The Odds API) ve takım ismi eşleştirmesi.
+8. Günlük güncelleme komutu + terminal bülteni (v1) → Pazar akşamı ilk canlı deneme.
+9. v2: korner/kart motorları, Oran İkizleri (k-NN), Smart Money (archangel oran hareketleri), Streamlit UI.
+
+Not: Pazar akşamı hedefine yetişmek için 1-6 adımları sade tutulur (önce Elo + rolling gol/şut feature'ları + Dixon-Coles; xG katmanı ve dakika feature'ları gerekirse v1.1).
 
 ## 7. Doc 06 İçin Düzeltmeler
 - "16 tablo" artık geçerli değil (temizlik yapıldı).
