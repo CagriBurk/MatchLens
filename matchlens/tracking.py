@@ -15,23 +15,32 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS prediction_log (
     event_id TEXT NOT NULL, market TEXT NOT NULL, league TEXT, kickoff_utc TEXT,
     home_team TEXT, away_team TEXT, lam_home REAL, lam_away REAL,
-    model_p REAL, line REAL, b365 REAL, ev REAL, logged_at TEXT,
+    model_p REAL, twin_p REAL, market_p REAL, line REAL, b365 REAL, ev REAL, logged_at TEXT,
     home_goals REAL, away_goals REAL, outcome REAL, profit REAL, settled_at TEXT,
     PRIMARY KEY (event_id, market)
 )
 """
 UPSERT = """
 INSERT INTO prediction_log (event_id, market, league, kickoff_utc, home_team, away_team, lam_home, lam_away,
-                            model_p, line, b365, ev, logged_at)
+                            model_p, twin_p, market_p, line, b365, ev, logged_at)
 VALUES (:event_id, :market, :league, :kickoff_utc, :home_team, :away_team, :lam_home, :lam_away,
-        :model_p, :line, :b365, :ev, :logged_at)
+        :model_p, :twin_p, :market_p, :line, :b365, :ev, :logged_at)
 ON CONFLICT(event_id, market) DO UPDATE SET
     kickoff_utc = excluded.kickoff_utc, lam_home = excluded.lam_home, lam_away = excluded.lam_away,
-    model_p = excluded.model_p, line = excluded.line, b365 = excluded.b365, ev = excluded.ev,
+    model_p = excluded.model_p, twin_p = excluded.twin_p, market_p = excluded.market_p, line = excluded.line, b365 = excluded.b365, ev = excluded.ev,
     logged_at = excluded.logged_at
 WHERE prediction_log.settled_at IS NULL
 """
+MIGRATIONS = {"twin_p": "REAL", "market_p": "REAL"}
 MATCH_FIELDS = ["event_id", "league", "kickoff_utc", "home_team", "away_team", "lam_home", "lam_away"]
+
+
+def ensure_schema(conn):
+    conn.execute(SCHEMA)
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(prediction_log)")}
+    for name, kind in MIGRATIONS.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE prediction_log ADD COLUMN {name} {kind}")
 
 
 def clean(value):
@@ -49,13 +58,14 @@ def prediction_rows(records, candidates, logged_at):
         base = {field: record[field] for field in MATCH_FIELDS}
         for market in LOG_MARKETS:
             offer = priced.get((record["event_id"], market), {})
-            rows.append({**base, "market": market, "model_p": record[market], "line": None,
+            rows.append({**base, "market": market, "model_p": record[market], "twin_p": record.get(f"twin_{market}"),
+                         "market_p": record.get(f"market_{market}"), "line": None,
                          "b365": offer.get("b365"), "ev": offer.get("ev"), "logged_at": logged_at})
     if not candidates.empty:
         meta = records.set_index("event_id")[["lam_home", "lam_away"]].to_dict("index")
         for offer in candidates[candidates["key"].str.startswith("asian_")].to_dict("records"):
             base = {field: offer.get(field) for field in MATCH_FIELDS[:5]}
-            rows.append({**base, **meta[offer["event_id"]], "market": offer["key"], "model_p": None,
+            rows.append({**base, **meta[offer["event_id"]], "market": offer["key"], "model_p": None, "twin_p": None, "market_p": None,
                          "line": offer["line"], "b365": offer["b365"], "ev": offer["ev"], "logged_at": logged_at})
     return [{k: clean(v) for k, v in row.items()} for row in rows]
 
@@ -67,7 +77,7 @@ def log_predictions(records, candidates, now=None):
     rows = prediction_rows(records, candidates, now.isoformat())
     rows = [r for r in rows if pd.Timestamp(r["kickoff_utc"]) > now]
     with connect() as conn:
-        conn.execute(SCHEMA)
+        ensure_schema(conn)
         conn.executemany(UPSERT, rows)
     return len(rows)
 
@@ -110,7 +120,7 @@ def market_profit(row, match):
 def settle(matches, now=None):
     now = now or pd.Timestamp.now(tz="UTC")
     with connect() as conn:
-        conn.execute(SCHEMA)
+        ensure_schema(conn)
         pending = pd.read_sql_query("SELECT event_id, market, line, b365 FROM prediction_log WHERE settled_at IS NULL", conn)
         if pending.empty:
             return 0
@@ -134,16 +144,21 @@ def settle(matches, now=None):
 
 def report(min_ev=MIN_EV):
     with connect() as conn:
-        conn.execute(SCHEMA)
+        ensure_schema(conn)
         log = pd.read_sql_query("SELECT * FROM prediction_log WHERE settled_at IS NOT NULL", conn)
     if log.empty:
         return None, None
-    scored = log.dropna(subset=["model_p", "outcome"])
-    p = scored["model_p"].clip(1e-9, 1 - 1e-9)
-    scored = scored.assign(brier=(p - scored["outcome"]) ** 2,
-                           logloss=-(scored["outcome"] * np.log(p) + (1 - scored["outcome"]) * np.log(1 - p)))
-    accuracy = scored.groupby("market").agg(n=("outcome", "size"), model=("model_p", "mean"), actual=("outcome", "mean"),
-                                            brier=("brier", "mean"), logloss=("logloss", "mean"))
+    rows = []
+    for market, group in log.dropna(subset=["outcome"]).groupby("market"):
+        row = {"market": market, "n": len(group), "actual": group["outcome"].mean()}
+        for source in ("model_p", "twin_p", "market_p"):
+            scored = group.dropna(subset=[source])
+            name = source.replace("_p", "")
+            row[f"{name}_n"] = len(scored)
+            row[f"{name}_mean"] = scored[source].mean() if len(scored) else np.nan
+            row[f"{name}_brier"] = ((scored[source] - scored["outcome"]) ** 2).mean() if len(scored) else np.nan
+        rows.append(row)
+    accuracy = pd.DataFrame(rows).set_index("market") if rows else pd.DataFrame()
     bets = log.dropna(subset=["profit", "ev"])
     bets = bets[bets["ev"] > min_ev]
     betting = bets.groupby("market").agg(bets=("profit", "size"), profit=("profit", "sum"), roi=("profit", "mean"))

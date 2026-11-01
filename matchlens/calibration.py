@@ -31,14 +31,22 @@ FROM footystats_matches WHERE espn_event_id IS NOT NULL
 """
 
 
-def load_frame():
+def attach_odds(preds):
     with connect() as conn:
-        preds = pd.read_sql_query("SELECT * FROM backtest_predictions", conn)
         kaggle = pd.read_sql_query(KAGGLE_QUERY, conn).drop_duplicates("event_id")
         footystats = pd.read_sql_query(FOOTYSTATS_QUERY, conn).drop_duplicates("event_id")
+        if "b365_home" not in preds:
+            espn = pd.read_sql_query("SELECT * FROM espn_odds", conn).drop_duplicates("event_id")
+            preds = preds.merge(espn, on="event_id", how="left")
     df = preds.merge(kaggle, on="event_id", how="left").merge(footystats, on="event_id", how="left")
     df["kickoff"] = pd.to_datetime(df["kickoff"], utc=True)
     return df
+
+
+def load_frame():
+    with connect() as conn:
+        preds = pd.read_sql_query("SELECT * FROM backtest_predictions", conn)
+    return attach_odds(preds)
 
 
 def market_inputs(df):

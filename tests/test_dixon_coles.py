@@ -69,3 +69,14 @@ def test_unknown_team_gets_newcomer_strength():
     lam_known, _ = model.expected_goals("9", "0")
     lam_new, _ = model.expected_goals("unknown", "0")
     assert lam_new < lam_known
+
+
+def test_custom_targets_and_fixed_rho():
+    matches, attack = synthetic_league()
+    matches["home_mix"] = 0.5 * matches["home_goals"] + 0.5 * matches["home_goals"].mean()
+    matches["away_mix"] = 0.5 * matches["away_goals"] + 0.5 * matches["away_goals"].mean()
+    ref = matches["kickoff"].max() + pd.Timedelta(days=1)
+    model = dixon_coles.fit(matches, ref, xi=0.0, ridge=0.1, targets=("home_mix", "away_mix"), fixed_rho=-0.07)
+    assert model.rho == pytest.approx(-0.07)
+    goals_model = dixon_coles.fit(matches, ref, xi=0.0, ridge=0.1)
+    assert np.std(model.attack) < np.std(goals_model.attack)

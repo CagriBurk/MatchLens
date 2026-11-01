@@ -2,24 +2,27 @@ import argparse
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import numpy as np
 import pandas as pd
 
 from data_pipeline.config import DATA_DIR
 from data_pipeline.espn import client, parse
 from data_pipeline.espn.leagues import LEAGUES
 from data_pipeline.ingest_espn import current_year
-from matchlens import blend, dixon_coles, markets, odds
-from matchlens.market_lambda import ImpliedLambda
+from matchlens import dixon_coles, markets, odds, twins
 from matchlens.data import finished, load_matches
+from matchlens.market_lambda import fair_three_way, fair_two_way
 
 LOCAL_TZ = ZoneInfo("Europe/Istanbul")
 BULLETIN_DIR = DATA_DIR / "bulletins"
 MIN_EV = 0.03
 MAX_ODDS = 6.0
+AGREEMENT_EDGE = 0.04
 ODDS_MARKETS = [
     ("1", "home", "b365_home"), ("X", "draw", "b365_draw"), ("2", "away", "b365_away"),
     ("1X", "dc_1x", "b365_dc_home_draw"), ("12", "dc_12", "b365_dc_home_away"), ("X2", "dc_x2", "b365_dc_draw_away"),
 ]
+COMPARE_MARKETS = [("1", "home"), ("X", "draw"), ("2", "away"), ("O2.5", "over_2.5"), ("BTTS", "btts_yes")]
 SURPRISE_MARKETS = [
     ("BH-BTTS", "both_halves_btts"), ("BH-O1.5", "both_halves_over_1.5"), ("6+", "goals_6plus"),
     ("0-15", "early_goal_0_15"), ("HT/FT 1/2", "htft_1/2"), ("HT/FT 2/1", "htft_2/1"),
@@ -56,39 +59,51 @@ def fetch_odds(day):
     return rows
 
 
-def evaluate_match(match, model, odds_row, solver):
-    model_lams = model.expected_goals(match.home_team_id, match.away_team_id)
-    market_lams = blend.market_lambdas(solver, odds_row) if odds_row else None
-    (lam_h, lam_a), source = blend.final_lambdas(match.league, model_lams, market_lams)
+def market_view(odds_row):
+    prices = [odds_row.get(key) for key in ("b365_home", "b365_draw", "b365_away")]
+    if not all(prices):
+        return {}
+    fair = fair_three_way([prices[0]], [prices[1]], [prices[2]])[0]
+    view = {"market_home": fair[0], "market_draw": fair[1], "market_away": fair[2]}
+    line, over, under = odds_row.get("b365_goal_line"), odds_row.get("b365_over"), odds_row.get("b365_under")
+    if line == 2.5 and over and under:
+        view["market_over_2.5"] = float(fair_two_way(over, under))
+    return view
+
+
+def twin_view(finder, market, kickoff):
+    if not market:
+        return {}
+    summary = finder.summarize(market["market_home"], market["market_away"], market.get("market_over_2.5"), before=kickoff)
+    view = {f"twin_{m}": summary[m] for m in twins.MARKETS}
+    view.update({"twin_n": summary["n"], "twin_scores": summary["top_scores"]})
+    return view
+
+
+def evaluate_match(match, model, odds_row, finder):
+    lam_h, lam_a = model.expected_goals(match.home_team_id, match.away_team_id)
     probs, matrix = markets.market_probs(lam_h, lam_a, model.rho, model.shares)
     totals = markets.total_distribution(matrix)
     kickoff = match.kickoff.tz_convert(LOCAL_TZ).strftime("%H:%M")
     base = {"event_id": match.event_id, "league": match.league, "kickoff": kickoff, "kickoff_utc": match.kickoff_utc,
-            "home_team": match.home_team, "away_team": match.away_team, "lam_home": lam_h, "lam_away": lam_a, "source": source}
-    record = {**base, **probs, "model_lam_home": model_lams[0], "model_lam_away": model_lams[1]}
+            "home_team": match.home_team, "away_team": match.away_team, "lam_home": lam_h, "lam_away": lam_a}
+    market = market_view(odds_row) if odds_row else {}
+    record = {**base, **probs, **market, **twin_view(finder, market, match.kickoff)}
     record["top_scores"] = " ".join(f"{h}-{a}" for h, a, _ in markets.top_scores(matrix, 3))
     candidates = []
     if odds_row:
         record.update({k: v for k, v in odds_row.items() if k != "event_id"})
-        model_probs, model_matrix = markets.market_probs(*model_lams, model.rho, model.shares)
-        model_totals = markets.total_distribution(model_matrix)
         for label, key, column in ODDS_MARKETS:
             price = odds_row.get(column)
-            if not price:
-                continue
-            candidates.append({**base, "market": label, "key": key, "line": None, "prob": probs[key],
-                               "model_p": model_probs[key], "b365": price,
-                               "ev": odds.expected_value(probs[key], price),
-                               "model_ev": odds.expected_value(model_probs[key], price)})
+            if price:
+                candidates.append({**base, "market": label, "key": key, "line": None, "model_p": probs[key],
+                                   "b365": price, "ev": odds.expected_value(probs[key], price)})
         line = odds_row.get("b365_goal_line")
         for side in ("over", "under"):
             price = odds_row.get(f"b365_{side}")
-            if line is None or not price:
-                continue
-            candidates.append({**base, "market": f"{side.title()} {line:g}", "key": f"asian_{side}", "line": line,
-                               "prob": None, "model_p": None, "b365": price,
-                               "ev": odds.asian_total_ev(totals, line, price, side),
-                               "model_ev": odds.asian_total_ev(model_totals, line, price, side)})
+            if line is not None and price:
+                candidates.append({**base, "market": f"{side.title()} {line:g}", "key": f"asian_{side}", "line": line,
+                                   "model_p": None, "b365": price, "ev": odds.asian_total_ev(totals, line, price, side)})
     return record, candidates
 
 
@@ -97,64 +112,88 @@ def build(dates, leagues, refresh=True):
     if day.empty:
         return pd.DataFrame(), pd.DataFrame()
     odds_rows = fetch_odds(day)
-    solver = ImpliedLambda()
+    finder = twins.TwinFinder(twins.load_pool())
     now = pd.Timestamp.now(tz="UTC")
     records, candidates = [], []
     for league, league_day in day.groupby("league"):
         model = dixon_coles.fit(finished(matches[matches["league"].eq(league)]), now)
         for match in league_day.itertuples():
-            record, cands = evaluate_match(match, model, odds_rows.get(match.event_id), solver)
+            record, cands = evaluate_match(match, model, odds_rows.get(match.event_id), finder)
             records.append(record)
             candidates.extend(cands)
     return pd.DataFrame(records), pd.DataFrame(candidates)
 
 
-def pct(series, digits=0):
-    values = (100 * series.astype(float)).round(digits)
-    return values.astype("Int64") if digits == 0 else values
+def pct_text(value, digits=0):
+    return "-" if value is None or pd.isna(value) else f"{100 * value:.{digits}f}"
 
 
-def prob_with_fair(series):
-    return series.astype(float).map(lambda p: f"{100 * p:.1f}% @{1 / p:.1f}" if p > 0 else "-")
+def column(records, name):
+    return records[name] if name in records else pd.Series(np.nan, index=records.index)
 
 
 def match_names(df):
     return df["home_team"].str.slice(0, 18) + " - " + df["away_team"].str.slice(0, 18)
 
 
-def render(records, candidates, min_ev, show_edges=False):
-    for column in ("b365_home", "b365_draw", "b365_away"):
-        if column not in records:
-            records[column] = None
+def compare_table(records):
     table = pd.DataFrame({
-        "lg": records["league"], "time": records["kickoff"], "match": match_names(records), "src": records["source"],
+        "lg": records["league"], "time": records["kickoff"], "match": match_names(records),
         "xg": records["lam_home"].round(2).astype(str) + "-" + records["lam_away"].round(2).astype(str),
-        "1": pct(records["home"]), "X": pct(records["draw"]), "2": pct(records["away"]),
-        "o1.5": pct(records["over_1.5"]), "o2.5": pct(records["over_2.5"]), "o3.5": pct(records["over_3.5"]),
-        "btts": pct(records["btts_yes"]), "scores": records["top_scores"],
     })
-    table["b365 1/X/2"] = records[["b365_home", "b365_draw", "b365_away"]].apply(
-        lambda r: "/".join(f"{v:.2f}" for v in r) if r.notna().all() else "-", axis=1)
-    surprise = pd.DataFrame({"match": match_names(records), "src": records["source"]})
+    for label, key in COMPARE_MARKETS:
+        model, twin, market = records[key], column(records, f"twin_{key}"), column(records, f"market_{key}")
+        table[label] = [f"{pct_text(m)}/{pct_text(t)}/{pct_text(p)}" for m, t, p in zip(model, twin, market)]
+    table["b365 1/X/2"] = records.apply(
+        lambda r: "/".join(f"{r[c]:.2f}" for c in ("b365_home", "b365_draw", "b365_away"))
+        if all(pd.notna(r.get(c)) for c in ("b365_home", "b365_draw", "b365_away")) else "-", axis=1)
+    return table
+
+
+def surprise_table(records):
+    table = pd.DataFrame({"match": match_names(records)})
     for label, key in SURPRISE_MARKETS:
-        surprise[label] = prob_with_fair(records[key])
+        twin = column(records, f"twin_{key}")
+        table[label] = [f"{pct_text(m, 1)}/{pct_text(t, 1)}" for m, t in zip(records[key], twin)]
+    return table
+
+
+def scores_table(records):
+    return pd.DataFrame({"match": match_names(records), "model": records["top_scores"],
+                         "twins": column(records, "twin_scores").fillna("-")})
+
+
+def agreement_table(records, edge=AGREEMENT_EDGE):
+    rows = []
+    for label, key in COMPARE_MARKETS:
+        if f"twin_{key}" not in records or f"market_{key}" not in records:
+            continue
+        model, twin, market = records[key], records[f"twin_{key}"], records[f"market_{key}"]
+        hit = (model - market > edge) & (twin - market > edge)
+        for i in np.flatnonzero(hit.fillna(False).to_numpy()):
+            r = records.iloc[i]
+            rows.append({"lg": r["league"], "time": r["kickoff"], "match": match_names(records.iloc[[i]]).iloc[0],
+                         "market": label, "model": pct_text(model.iloc[i]), "twins": pct_text(twin.iloc[i]),
+                         "market%": pct_text(market.iloc[i])})
+    return pd.DataFrame(rows)
+
+
+def render(records, candidates, min_ev, show_edges=False):
     with pd.option_context("display.width", 250, "display.max_columns", 30, "display.max_rows", 500):
-        print(f"Matches ({len(table)}), probabilities in %, src=b365: anchored to Bet365 odds, src=model: model only")
-        print(table.to_string(index=False))
-        print("\nSurprise markets: probability @ fair odds")
-        print(surprise.to_string(index=False))
+        print(f"Matches ({len(records)}): model / odds twins / Bet365 market, in %")
+        print(compare_table(records).to_string(index=False))
+        print("\nSurprise markets: model / odds twins, in %")
+        print(surprise_table(records).to_string(index=False))
+        print("\nMost likely scores")
+        print(scores_table(records).to_string(index=False))
+        agreement = agreement_table(records)
+        print(f"\nModel and twins both above market by {AGREEMENT_EDGE:.0%} (informational; 2019-2026 backtest ROI of this rule was negative)")
+        print("none" if agreement.empty else agreement.to_string(index=False))
         if not show_edges or candidates.empty:
             return
-        value = candidates[(candidates["model_ev"] > min_ev) & (candidates["b365"] <= MAX_ODDS)].sort_values("model_ev", ascending=False)
-        print(f"\nExperimental: pure model vs Bet365 (EV > {min_ev:.0%}); backtest ROI of this signal is negative")
-        if value.empty:
-            print("none")
-            return
-        view = pd.DataFrame({
-            "lg": value["league"], "time": value["kickoff"], "match": match_names(value), "market": value["market"],
-            "model%": pct(value["model_p"]), "b365": value["b365"].round(2), "model_ev%": pct(value["model_ev"]),
-        })
-        print(view.to_string(index=False))
+        value = candidates[(candidates["ev"] > min_ev) & (candidates["b365"] <= MAX_ODDS)].sort_values("ev", ascending=False)
+        print(f"\nExperimental: model vs Bet365 (EV > {min_ev:.0%}); backtest ROI of this signal is negative")
+        print("none" if value.empty else value[["league", "kickoff", "home_team", "away_team", "market", "b365", "ev"]].round(3).to_string(index=False))
 
 
 def save(records, candidates, date):

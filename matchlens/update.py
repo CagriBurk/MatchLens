@@ -5,7 +5,7 @@ import pandas as pd
 
 from data_pipeline.espn.leagues import LEAGUES
 from data_pipeline.ingest_espn import build_tables, current_year, fetch_summaries, summary_targets
-from matchlens import bulletin, tracking
+from matchlens import bulletin, tracking, twins
 from matchlens.data import load_matches
 
 LOG_DAYS = 3
@@ -17,6 +17,8 @@ def run(leagues, days, workers):
     targets = summary_targets(leagues, years)
     fetch_summaries(targets, workers=workers)
     build_tables(leagues, years, incremental=True)
+    pool = twins.build_pool()
+    print(f"twins_pool: {len(pool)} matches")
 
     matches = load_matches(leagues, from_year=current_year() - 1)
     settled = tracking.settle(matches)

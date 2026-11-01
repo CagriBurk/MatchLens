@@ -14,7 +14,7 @@ MAX_ODDS = 6.0
 EPS = 1e-12
 
 
-def walk_forward(matches, start, xi, ridge):
+def walk_forward(matches, start, xi, ridge, targets=("home_goals", "away_goals"), fixed_rho=None):
     rows = []
     for league, league_matches in matches.groupby("league"):
         played = finished(league_matches)
@@ -23,7 +23,7 @@ def walk_forward(matches, start, xi, ridge):
         for week_start, week in test.groupby(test["kickoff"].dt.to_period("W-MON").dt.start_time):
             ref = pd.Timestamp(week_start, tz="UTC")
             try:
-                model = dixon_coles.fit(played, ref, xi=xi, ridge=ridge, warm_start=model)
+                model = dixon_coles.fit(played, ref, xi=xi, ridge=ridge, warm_start=model, targets=targets, fixed_rho=fixed_rho)
             except ValueError:
                 continue
             for match in week.itertuples():

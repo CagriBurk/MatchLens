@@ -103,7 +103,8 @@ def half_shares(matches):
     }
 
 
-def fit(matches: pd.DataFrame, ref_date, xi=XI, ridge=RIDGE, window_days=WINDOW_DAYS, warm_start=None):
+def fit(matches: pd.DataFrame, ref_date, xi=XI, ridge=RIDGE, window_days=WINDOW_DAYS, warm_start=None,
+        targets=("home_goals", "away_goals"), fixed_rho=None):
     ref_date = pd.Timestamp(ref_date)
     days_ago = (ref_date - matches["kickoff"]).dt.total_seconds() / 86400
     train = matches[(days_ago > 0) & (days_ago <= window_days)]
@@ -116,8 +117,8 @@ def fit(matches: pd.DataFrame, ref_date, xi=XI, ridge=RIDGE, window_days=WINDOW_
     n = len(teams)
     hi = train["home_team_id"].map(index).to_numpy()
     ai = train["away_team_id"].map(index).to_numpy()
-    hg = train["home_goals"].to_numpy(dtype=float)
-    ag = train["away_goals"].to_numpy(dtype=float)
+    hg = train[targets[0]].to_numpy(dtype=float)
+    ag = train[targets[1]].to_numpy(dtype=float)
     w = np.exp(-xi * days_ago)
 
     first_seen = pd.concat([
@@ -140,7 +141,10 @@ def fit(matches: pd.DataFrame, ref_date, xi=XI, ridge=RIDGE, window_days=WINDOW_
                 x0[3 + i] = warm_start.attack[lookup[t]]
                 x0[3 + n + i] = warm_start.defence[lookup[t]]
 
-    bounds = [(None, None), (None, None), RHO_BOUNDS] + [(-3, 3)] * (2 * n)
+    rho_bounds = RHO_BOUNDS if fixed_rho is None else (fixed_rho, fixed_rho)
+    if fixed_rho is not None:
+        x0[2] = fixed_rho
+    bounds = [(None, None), (None, None), rho_bounds] + [(-3, 3)] * (2 * n)
     result = minimize(
         neg_log_likelihood, x0, jac=True, method="L-BFGS-B", bounds=bounds,
         args=(hi, ai, hg, ag, w, n, prior_att, prior_def, ridge),
