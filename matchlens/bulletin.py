@@ -116,6 +116,20 @@ def twin_view(finder, market, kickoff):
     return view
 
 
+def reference_view(market, shares):
+    p_over = market.get("market_over_2.5") if market else None
+    if p_over is None or pd.isna(p_over):
+        return {}
+    home, draw, away = market["market_home"], market["market_draw"], market["market_away"]
+    lam_h, lam_a = implied_lambda().solve([home], [away], [p_over], line=2.5)
+    probs, _ = markets.market_probs(lam_h[0], lam_a[0], DEFAULT_RHO, shares)
+    probs.update({"home": home, "draw": draw, "away": away, "dc_1x": home + draw, "dc_12": home + away, "dc_x2": draw + away,
+                  "over_2.5": p_over, "under_2.5": 1 - p_over})
+    view = {f"ref_{key}": value for key, value in probs.items()}
+    view.update({"ref_src": market["market_src"], "ref_ou_src": market["market_ou_src"]})
+    return view
+
+
 def evaluate_match(match, model, odds_row, finder, goal_weights=None):
     lam_h, lam_a = model.expected_goals(match.home_team_id, match.away_team_id)
     probs, matrix = markets.market_probs(lam_h, lam_a, model.rho, model.shares, goal_weights=goal_weights)
@@ -124,7 +138,7 @@ def evaluate_match(match, model, odds_row, finder, goal_weights=None):
     base = {"event_id": match.event_id, "league": match.league, "kickoff": kickoff, "kickoff_utc": match.kickoff_utc,
             "home_team": match.home_team, "away_team": match.away_team, "lam_home": lam_h, "lam_away": lam_a}
     market = market_view(odds_row) if odds_row else {}
-    record = {**base, **probs, **market, **twin_view(finder, market, match.kickoff)}
+    record = {**base, **probs, **market, **twin_view(finder, market, match.kickoff), **reference_view(market, model.shares)}
     record["top_scores"] = " ".join(f"{h}-{a}" for h, a, _ in markets.top_scores(matrix, 3))
     record["rho"] = model.rho
     candidates = []

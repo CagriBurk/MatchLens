@@ -439,6 +439,7 @@ SELECTION_LABEL = {
     "btts_yes": "KG Var", "btts_no": "KG Yok", "ht_home": "İY 1", "ht_draw": "İY X", "ht_away": "İY 2",
     "ht_over_0.5": "İY 0.5 Üst", "ht_over_1.5": "İY 1.5 Üst", "goals_6plus": "6+ Gol", "both_halves_over_1.5": "İki yarıda 1.5 Üst",
 }
+SIDE_NAME = {"model": "Model", "twin": "İkiz", None: "Model ve İkiz"}
 COUPON_STYLE = {
     "blue": ("Mavi kupon", "Düşük oran, yüksek güven", "#38BDF8"),
     "yellow": ("Sarı kupon", "Orta oran", "#F59E0B"),
@@ -481,6 +482,9 @@ def leg_rows(legs, show_status=True):
         value = leg["p_safe"] * leg["odds"]
         tag = '<span class="ml-agree-tag" style="font-size:13px">DEĞER</span>' if value >= 1 else f'<span class="ml-dim" style="font-size:12px">×{value:.2f}</span>'
         book = "—" if pd.isna(leg.get("p_book")) else pct(leg["p_book"])
+        ref = leg.get("p_ref")
+        approx = '<span class="ml-dim">~</span>' if str(leg.get("ref_src") or "").endswith("~") else ""
+        reference = "—" if ref is None or pd.isna(ref) else f"{approx}{pct(ref)}"
         status = leg_status(leg.get("outcome")) if show_status else ""
         rows.append(
             f'<div class="ml-row" style="min-height:52px"><span class="ml-mono ml-muted" style="font-size:13px">{local:%H:%M}</span>'
@@ -489,23 +493,24 @@ def leg_rows(legs, show_status=True):
             f'<span style="font-weight:600">{selection_label(leg["key"])}</span>'
             f'<span class="ml-r ml-mono ml-big">{leg["odds"]:.2f}</span>'
             f'<span class="ml-r ml-mono ml-model">{pct(leg["p_model"])}</span><span class="ml-r ml-mono ml-twin">{pct(leg["p_twin"])}</span>'
-            f'<span class="ml-r ml-mono">{book}</span><span class="ml-r">{tag}</span><span class="ml-r">{status}</span></div>')
+            f'<span class="ml-r ml-mono">{reference}</span><span class="ml-r ml-mono ml-muted">{book}</span><span class="ml-r">{tag}</span><span class="ml-r">{status}</span></div>')
     return "".join(rows)
 
 
 def leg_head():
     return ('<div class="ml-head"><span>Saat</span><span>Lig</span><span>Maç</span><span>Seçim</span><span class="ml-r">İddaa</span>'
-            '<span class="ml-r ml-model">Model</span><span class="ml-r ml-twin">İkiz</span><span class="ml-r">İddaa %</span>'
+            '<span class="ml-r ml-model">Model</span><span class="ml-r ml-twin">İkiz</span><span class="ml-r">Piyasa %</span><span class="ml-r">İddaa %</span>'
             '<span class="ml-r">P×O</span><span class="ml-r">Sonuç</span></div>')
 
 
-def coupon_card(name, legs):
-    title, subtitle, color = COUPON_STYLE[name]
+def coupon_card(tier, legs, side=None):
+    title, subtitle, color = COUPON_STYLE[tier]
+    reference = "İddaa'nın" if side is None else "Bet365/DraftKings'in"
     head = (f'<div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px;padding:18px 0 12px;border-top:3px solid {color}">'
             f'<div><h2 class="ml-h2" style="color:{color}">{title}</h2><span class="ml-muted" style="font-size:14px">{subtitle}</span></div>')
     if legs.empty:
         return (f'<section style="padding-top:28px">{head}</div><div class="ml-empty"><span>Bugün bu kupon için uygun seçim çıkmadı.</span>'
-                f'<span class="ml-muted" style="font-size:14px">Model ve İkiz, oran aralığındaki hiçbir seçimde İddaa\'nın marjsız yüzdesine ulaşmadı.</span></div></section>')
+                f'<span class="ml-muted" style="font-size:14px">{SIDE_NAME[side]}, oran aralığındaki hiçbir seçimde {reference} marjsız yüzdesine ulaşmadı.</span></div></section>')
     odds = float(np.prod(legs["odds"]))
     hit = float(np.prod(legs["p_safe"]))
     valued = int((legs["p_safe"] * legs["odds"] >= 1).sum())
@@ -519,9 +524,10 @@ def coupon_card(name, legs):
             f'{leg_head()}{leg_rows(legs)}</div></div></section>')
 
 
-def surprise_list(legs):
+def surprise_list(legs, side=None):
+    basis = "Model ve İkiz'in güvenli olasılığı" if side is None else f"{SIDE_NAME[side]} olasılığı (Bet365/DK'dan düşük değil)"
     head = ('<div class="ml-section-head" style="border-top:3px solid #9CA3AF;margin-top:28px"><div><h2 class="ml-h2">Sürpriz adaylar</h2>'
-            '<span class="ml-muted" style="font-size:14px">Kupon değil; sistem kuponu için havuz. Model ve İkiz\'in güvenli olasılığı × İddaa oranına göre sıralı.</span></div></div>')
+            f'<span class="ml-muted" style="font-size:14px">Kupon değil; sistem kuponu için havuz. {basis} × İddaa oranına göre sıralı.</span></div></div>')
     if legs.empty:
         return f'<section>{head}<div class="ml-empty"><span>Bugün aday yok.</span></div></section>'
     return f'<section>{head}<div class="ml-scroll"><div class="ml-coupon">{leg_head()}{leg_rows(legs)}</div></div></section>'

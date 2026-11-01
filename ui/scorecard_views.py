@@ -1,10 +1,20 @@
 import pandas as pd
 
+from matchlens.coupons import split_name
 from ui.views import SELECTION_LABEL, SOURCE_NAME, pct, scale_head, selection_label, signed
 
 SELECTION_LABEL.update({"both_halves_btts": "İki yarıda KG", "early_goal_0_15": "0–15 dk gol"})
 SOURCE_LABEL = {"model": ("Model", "#38BDF8"), "twin": ("İkiz", "#F59E0B"), "market": ("Piyasa", "#F9FAFB")}
 COUPON_SHORT = {"blue": ("Mavi", "#38BDF8"), "yellow": ("Sarı", "#F59E0B"), "red": ("Kırmızı", "#EF4444"), "surprise": ("Sürpriz", "#9CA3AF")}
+SIDE_SHORT = {"model": "Model", "twin": "İkiz", None: "Eski"}
+
+
+def coupon_label(name):
+    side, tier = split_name(name)
+    label, color = COUPON_SHORT[tier]
+    return f"{SIDE_SHORT[side]} · {label}", color
+
+
 STATUS_LABEL = {"won": '<span style="color:#22C55E;font-weight:700">tuttu</span>', "lost": '<span style="color:#EF4444;font-weight:700">yattı</span>',
                 "pending": '<span class="ml-muted">bekliyor</span>'}
 
@@ -94,7 +104,7 @@ def market_source_section(table):
 def coupon_summary_section(summary, legs):
     rows = []
     for coupon, row in summary.iterrows():
-        label, color = COUPON_SHORT[coupon]
+        label, color = coupon_label(coupon)
         leg = legs.loc[coupon] if coupon in legs.index else None
         rows.append([f'<span class="ml-label" style="color:{color};font-weight:600">{label}</span>', r(int(row["coupons"])),
                      r(f'{int(row["won"])}/{int(row["settled"])}'), r(pct(row["hit_rate"], 1), "font-weight:700"),
@@ -103,16 +113,16 @@ def coupon_summary_section(summary, legs):
                      r(pct(leg["hit_rate"], 1) if leg is not None else "—"), r(pct(leg["p_safe"], 1) if leg is not None else "—", "color:#9CA3AF")])
     head = ["<span>Kupon</span>", r("Üretilen"), r("Tuttu"), r("Tutma %"), r("Beklenen"), r("Ort. oran"), r("ROI (puan)"),
             r("Seçim isabeti"), r("Beklenen")]
-    return section("Kupon karnesi", "Düz 1 birim · beklenen = güvenli olasılıklardan",
-                   grid("minmax(120px,1fr) repeat(8, minmax(80px,1fr))", head, rows, 960))
+    return section("Kupon karnesi", "Düz 1 birim · beklenen = kuponu seçen kaynağın olasılıkları · Eski = 01.11 kuralı (Model/İkiz küçüğü, İddaa referansı)",
+                   grid("minmax(150px,1.2fr) repeat(8, minmax(80px,1fr))", head, rows, 990))
 
 
 def coupon_history_section(results):
     rows = []
     for _, row in results.sort_values(["day", "coupon"], ascending=[False, True]).head(42).iterrows():
-        label, color = COUPON_SHORT[row["coupon"]]
+        label, color = coupon_label(row["coupon"])
         rows.append([f'<span class="ml-muted">{row["day"]}</span>', f'<span style="color:{color};font-weight:600;font-family:var(--ml-body)">{label}</span>',
                      r(int(row["legs"])), r(f'{row["odds"]:.2f}'), r(pct(row["expected"], 1), "color:#9CA3AF"), r(STATUS_LABEL[row["status"]])])
     head = ["<span>Gün</span>", "<span>Kupon</span>", r("Maç"), r("Oran"), r("Tahmini tutma"), r("Durum")]
-    body = grid("110px minmax(100px,1fr) 64px 80px 110px 100px", head, rows, 600) if rows else empty("Henüz kupon yok.")
+    body = grid("110px minmax(140px,1fr) 64px 80px 110px 100px", head, rows, 640) if rows else empty("Henüz kupon yok.")
     return section("Kupon geçmişi", "Son 14 gün", body)

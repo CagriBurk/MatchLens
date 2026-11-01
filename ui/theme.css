@@ -137,5 +137,5 @@
   .ml-teams { font-size: 44px; }
 }
 
-.ml-coupon { min-width: 1120px; }
-.ml-coupon .ml-head, .ml-coupon .ml-row { grid-template-columns: 52px 60px minmax(220px, 1.4fr) minmax(170px, 1fr) 64px 60px 60px 72px 64px 64px; }
+.ml-coupon { min-width: 1200px; }
+.ml-coupon .ml-head, .ml-coupon .ml-row { grid-template-columns: 52px 60px minmax(220px, 1.4fr) minmax(170px, 1fr) 64px 60px 60px 76px 72px 64px 64px; }

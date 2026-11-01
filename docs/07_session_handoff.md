@@ -20,7 +20,7 @@ Her maç için bağımsız kaynaklar yan yana (Bet365 oranı modele girmez):
 - **Oran İkizleri** (`twins.py`): marjsız 1/2/Ü2.5'e en yakın 200 geçmiş maçın gerçek sonuçları (kombolar dahil).
 - **Piyasa**: Bet365, yoksa DraftKings (ESPN summary); 2.5 çizgisi yoksa Asya çizgisinden çevrilir (`~`). Kapsama ~%95.
 - **İddaa (Nesine)** (`data_pipeline/nesine.py`): sadece kupon oranları ve İddaa marjsız yüzdesi.
-- Arayüz sekmeleri: Bülten, Maç detayı, Oran İkizleri, Kuponlar (mavi/sarı/kırmızı + sürpriz; Çağrı seçimleri beğenmedi, Model/İkiz olarak ikiye bölünecek), Karne (ileriye dönük isabet + kupon karnesi).
+- Arayüz sekmeleri: Bülten, Maç detayı, Oran İkizleri, Kuponlar (iki sekme: Modelin seçtikleri / İkiz oran; her birinde mavi/sarı/kırmızı + sürpriz; şart kaynak olasılığı ≥ Bet365/DK marjsız, gol/kombo marketlerinde türetilmiş `~`), Karne (ileriye dönük isabet + kupon karnesi).
 
 ## 4. Komutlar
 ```
@@ -52,7 +52,7 @@ powershell -File scripts\run_ui.ps1
 **Model ayarı donduruldu (Çağrı, 2026-11-01):** split30 (güç 3 / stil 30) üretimde, ölçüt kalibrasyon. Akşam denenen sıkı log-loss kapısı, mevsimsellik ve gol seviyesi takipçisi binde bir kazanç verdi, kanıtlanamadı, geri alındı (git: 2361300, ebfacae). 2026 sonbahar gol artışı öngörülemez şok; Karne'den izlenecek.
 
 Sıradaki (nitelikli işler):
-1. Kuponları "Modelin seçtikleri" ve "İkiz oran" olarak ikiye bölmek; kupon şartında referansı Bet365/DK yapmak (Çağrı makinenin seçimlerini beğenmedi).
+1. ~~Kuponları ikiye bölmek~~ yapıldı (2026-11-01 akşam, roadmap 5a). İlk yeni kuponlar 02.11 07:30 update ile; logun eksiksiz bittiğini kontrol et (01.11 11:57 çalışmasının logu "logged" satırında kesik, kuponlar 14:21'de elle üretilmişti).
 2. Karne'yi izlemek: ileriye dönük isabet ve kupon tutma oranı birkaç hafta birikince değerlendirilecek.
 3. Son faz (v3): canlı bildirim (roadmap Aşama 7).
 - Not: 01.11 tahminleri/kuponları ridge 5 ile üretildi; 02.11 07:30 update'ten itibaren split30.

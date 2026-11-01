@@ -29,7 +29,7 @@ def test_settlement_outcomes():
 
 def cands(rows):
     df = pd.DataFrame(rows, columns=["event_id", "key", "odds", "p_safe", "mbs"])
-    return df.assign(ratio=df["odds"] * df["p_safe"], p_book=1 / (df["odds"] * 1.15))
+    return df.assign(ratio=df["odds"] * df["p_safe"], p_ref=1 / (df["odds"] * 1.15))
 
 
 def test_build_stops_at_target_and_uses_one_leg_per_match():
@@ -54,10 +54,15 @@ def test_build_drops_legs_violating_mbs():
 
 def test_generate_and_settle_roundtrip():
     records = pd.DataFrame([{"event_id": str(i), "league": "eng.1", "kickoff_utc": "2030-01-01T19:00Z", "home_team": f"H{i}",
-                             "away_team": f"A{i}", "home": 0.75, "twin_home": 0.78} for i in range(4)])
+                             "away_team": f"A{i}", "home": 0.75, "twin_home": 0.78, "ref_home": 0.66, "ref_src": "b365"} for i in range(4)])
     offers = pd.DataFrame([{"event_id": str(i), "key": "home", "odds": 1.42, "mbs": 1} for i in range(4)])
     written = coupons.generate("2030-01-01", records, offers, now=pd.Timestamp("2029-12-31", tz="UTC"))
     assert written > 0 and coupons.exists("2030-01-01")
+    stored = coupons.load("2030-01-01")
+    assert {"model_blue", "twin_blue"} <= set(stored["coupon"])
+    assert stored.loc[stored["coupon"].eq("model_blue"), "p_safe"].eq(0.75).all()
+    assert stored.loc[stored["coupon"].eq("twin_blue"), "p_safe"].eq(0.78).all()
+    assert stored["ref_src"].eq("b365").all()
     assert coupons.generate("2030-01-01", records, offers, now=pd.Timestamp("2029-12-31", tz="UTC")) == 0
     matches = pd.DataFrame([{"event_id": str(i), "state": "post", "regular": True, "home_goals": 1.0, "away_goals": 0.0,
                              "ht_home": 0.0, "ht_away": 0.0, "events_consistent": True} for i in range(4)])
@@ -88,3 +93,32 @@ def test_nesine_fair_probability_handles_double_chance():
     fair = offers.set_index("key")["fair"]
     assert fair[["dc_1x", "dc_12", "dc_x2"]].sum() == pytest.approx(2.0)
     assert fair[["home", "draw", "away"]].sum() == pytest.approx(1.0)
+
+
+def test_sides_use_their_own_probability_against_reference():
+    records = pd.DataFrame([{"event_id": "1", "league": "eng.1", "kickoff_utc": "2030-01-01T19:00Z", "home_team": "H", "away_team": "A",
+                             "home": 0.70, "twin_home": 0.60, "ref_home": 0.65, "under_3.5": 0.70, "twin_under_3.5": 0.72,
+                             "ref_under_3.5": 0.68, "ref_src": "b365", "ref_ou_src": "dk"}])
+    offers = pd.DataFrame([{"event_id": "1", "key": "home", "odds": 1.45, "mbs": 1, "fair": 0.62},
+                           {"event_id": "1", "key": "under_3.5", "odds": 1.40, "mbs": 1, "fair": 0.66},
+                           {"event_id": "1", "key": "draw", "odds": 4.0, "mbs": 1, "fair": 0.24}])
+    cands = coupons.candidates(records, offers).set_index("key")
+    assert "draw" not in cands.index
+    assert cands.loc["home", "ref_src"] == "b365" and cands.loc["under_3.5", "ref_src"] == "b365~"
+    model = coupons.side_pool(coupons.candidates(records, offers), "model")
+    twin = coupons.side_pool(coupons.candidates(records, offers), "twin")
+    model_ok = model[model["p_safe"] >= model["p_ref"]]["key"].tolist()
+    twin_ok = twin[twin["p_safe"] >= twin["p_ref"]]["key"].tolist()
+    assert sorted(model_ok) == ["home", "under_3.5"] and twin_ok == ["under_3.5"]
+
+
+def test_reference_view_keeps_direct_market_and_derives_the_rest():
+    from matchlens import bulletin, dixon_coles
+    market = {"market_home": 0.5, "market_draw": 0.27, "market_away": 0.23, "market_src": "b365",
+              "market_over_2.5": 0.55, "market_ou_src": "b365"}
+    view = bulletin.reference_view(market, dict(dixon_coles.DEFAULT_SHARES))
+    assert view["ref_home"] == 0.5 and view["ref_dc_1x"] == pytest.approx(0.77) and view["ref_under_2.5"] == pytest.approx(0.45)
+    assert view["ref_over_1.5"] > view["ref_over_2.5"] > view["ref_over_3.5"]
+    assert view["ref_btts_yes"] + view["ref_btts_no"] == pytest.approx(1.0)
+    assert 0 < view["ref_htft_1/2"] < 0.1
+    assert bulletin.reference_view({**market, "market_over_2.5": None}, dixon_coles.DEFAULT_SHARES) == {}

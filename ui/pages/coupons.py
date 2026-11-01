@@ -22,12 +22,33 @@ with left:
 legs = coupons.load(day)
 created = pd.Timestamp(legs["created_at"].min()).tz_convert(data.LOCAL_TZ) if len(legs) else None
 when = f"Oranlar Nesine/İddaa, kuponun üretildiği an ({created:%H:%M}) itibarıyla. " if created is not None else ""
-st.html(views.page(
-    f'<p class="ml-sub" style="margin:0 0 4px">{when}Seçim şartı: Model ve İkiz\'in küçüğü (güvenli olasılık) İddaa\'nın marjsız '
-    f'yüzdesinden düşük değil. DEĞER: güvenli olasılık × oran ≥ 1. Tahmini tutma, seçimlerin bağımsız olduğu varsayımıyla çarpım.</p>'))
+legacy = legs["coupon"].isin(coupons.LEGACY).any()
 
-for name in ("blue", "yellow", "red"):
-    st.html(views.page(views.coupon_card(name, legs[legs["coupon"].eq(name)])))
-st.html(views.page(views.surprise_list(legs[legs["coupon"].eq("surprise")])))
-st.html(views.page('<p class="ml-note">Bilgi amaçlı. Backtest\'lerde ne model ne ikizler piyasayı yendi; İddaa marjı (~%15-19) '
-                   'her seçimde yeniden ödenir. Kuponların gerçek isabeti Karne\'de izlenecek.</p>'))
+
+def coupon_set(side):
+    prefix = "" if side is None else f"{side}_"
+    for tier in coupons.TIERS:
+        st.html(views.page(views.coupon_card(tier, legs[legs["coupon"].eq(f"{prefix}{tier}")], side)))
+    st.html(views.page(views.surprise_list(legs[legs["coupon"].eq(f"{prefix}surprise")], side)))
+
+
+if legacy:
+    st.html(views.page(
+        f'<p class="ml-sub" style="margin:0 0 4px">{when}Eski kural (01.11): Model ve İkiz\'in küçüğü İddaa\'nın marjsız yüzdesinden '
+        f'düşük değil. Bu günün kuponları eski modelle (ridge 5) üretildi.</p>'))
+    coupon_set(None)
+else:
+    st.html(views.page(
+        f'<p class="ml-sub" style="margin:0 0 4px">{when}İki ayrı set: her biri sadece kendi kaynağının olasılığına bakar. '
+        f'Seçim şartı: kaynağın olasılığı, Bet365\'in (yoksa DraftKings) marjsız yüzdesinden düşük değil. Bet365 sadece 1X2 ve 2.5 Üst/Alt '
+        f'fiyatlıyor; diğer marketlerde piyasa yüzdesi bu oranlardan çözülen gol beklentisiyle hesaplanır (~, yaklaşık). '
+        f'DEĞER: olasılık × İddaa oranı ≥ 1. Tahmini tutma, seçimlerin bağımsız olduğu varsayımıyla çarpım.</p>'))
+    model_tab, twin_tab = st.tabs(["Modelin seçtikleri", "İkiz oran"])
+    with model_tab:
+        coupon_set("model")
+    with twin_tab:
+        coupon_set("twin")
+
+st.html(views.page('<p class="ml-note">Bilgi amaçlı. Backtest\'lerde ne model ne ikizler piyasayı yendi; Bet365 modelden isabetli. '
+                   '"Model Bet365\'ten yüksek diyor" çoğu zaman modelin yanıldığı yer olabilir. İddaa marjı (~%15-19) her seçimde '
+                   'yeniden ödenir. Kuponların gerçek isabeti Karne\'de izleniyor.</p>'))

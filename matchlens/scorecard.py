@@ -7,7 +7,6 @@ from matchlens import coupons, tracking
 SOURCES = {"model": "model_p", "twin": "twin_p", "market": "market_p"}
 EPS = 1e-6
 BINS = np.linspace(0, 1, 11)
-COUPON_TYPES = ("blue", "yellow", "red")
 
 
 def load_predictions():
@@ -80,7 +79,7 @@ def coupon_results(legs):
     if legs.empty:
         return pd.DataFrame(columns=["day", "coupon", "legs", "odds", "expected", "status", "payout"])
     rows = []
-    for (day, coupon), group in legs[legs["coupon"].isin(COUPON_TYPES)].groupby(["day", "coupon"]):
+    for (day, coupon), group in legs[~legs["coupon"].str.endswith("surprise")].groupby(["day", "coupon"]):
         settled = group["settled_at"].notna()
         live = group[~(settled & group["outcome"].isna())]
         odds = float(np.prod(live["odds"])) if len(live) else 1.0
@@ -98,7 +97,9 @@ def coupon_results(legs):
 
 def coupon_summary(results):
     rows = []
-    for coupon in COUPON_TYPES:
+    present = set(results["coupon"]) if not results.empty else set()
+    names = [n for n in coupons.NAMES if not n.endswith("surprise")] + [n for n in coupons.LEGACY if n in present]
+    for coupon in names:
         group = results[results["coupon"].eq(coupon)] if not results.empty else results
         done = group[group["status"].isin(["won", "lost"])]
         won = int(done["status"].eq("won").sum())
@@ -111,7 +112,7 @@ def coupon_summary(results):
 
 
 def leg_summary(legs):
-    done = legs[legs["outcome"].notna() & legs["coupon"].isin(COUPON_TYPES + ("surprise",))]
+    done = legs[legs["outcome"].notna()]
     if done.empty:
         return pd.DataFrame(columns=["legs", "hit_rate", "p_safe", "p_book", "avg_odds", "roi"])
     table = done.groupby("coupon").agg(legs=("outcome", "size"), hit_rate=("outcome", "mean"), p_safe=("p_safe", "mean"),

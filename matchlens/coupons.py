@@ -8,27 +8,50 @@ TYPICAL_BOOK = 1.15
 SURPRISE_KEYS = ("goals_6plus", "htft_1/2", "htft_2/1", "both_halves_over_1.5")
 SURPRISE_SIZE = 10
 RESULT_COMBOS = tuple(k for k in selections.COMBOS if k.split("&")[0] in selections.RESULTS and ("btts_yes" in k or "over" in k))
-COUPONS = {
+RESULT_REFERENCE = ("home", "draw", "away", "dc_1x", "dc_12", "dc_x2")
+LINE_REFERENCE = ("over_2.5", "under_2.5")
+SIDES = {"model": "", "twin": "twin_"}
+TIERS = {
     "blue": {"odds": (1.35, 1.65), "target": 0.20, "min_legs": 2, "max_legs": 6, "prefer": ()},
     "yellow": {"odds": (1.70, 2.40), "target": 0.06, "min_legs": 2, "max_legs": 6, "prefer": ()},
     "red": {"odds": (2.50, 4.50), "target": 0.02, "min_legs": 2, "max_legs": 4, "prefer": RESULT_COMBOS},
 }
+NAMES = [f"{side}_{tier}" for side in SIDES for tier in (*TIERS, "surprise")]
+LEGACY = ("blue", "yellow", "red", "surprise")
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS coupon_log (
     day TEXT NOT NULL, coupon TEXT NOT NULL, leg INTEGER NOT NULL,
     event_id TEXT, league TEXT, kickoff_utc TEXT, home_team TEXT, away_team TEXT,
     key TEXT, odds REAL, mbs INTEGER, p_model REAL, p_twin REAL, p_safe REAL, p_book REAL, value INTEGER, created_at TEXT,
-    home_goals REAL, away_goals REAL, outcome REAL, settled_at TEXT,
+    home_goals REAL, away_goals REAL, outcome REAL, settled_at TEXT, p_ref REAL, ref_src TEXT,
     PRIMARY KEY (day, coupon, leg)
 )
 """
+ADDED_COLUMNS = {"p_book": "REAL", "p_ref": "REAL", "ref_src": "TEXT"}
 FIELDS = ["day", "coupon", "leg", "event_id", "league", "kickoff_utc", "home_team", "away_team", "key", "odds", "mbs",
-          "p_model", "p_twin", "p_safe", "p_book", "value", "created_at"]
+          "p_model", "p_twin", "p_safe", "p_book", "p_ref", "ref_src", "value", "created_at"]
+
+
+def split_name(name):
+    side, _, tier = name.rpartition("_")
+    return side or None, tier
 
 
 def book_probability(offer):
     fair = getattr(offer, "fair", None)
     return float(fair) if fair is not None and not pd.isna(fair) else 1 / (float(offer.odds) * TYPICAL_BOOK)
+
+
+def number(value):
+    return np.nan if value is None or pd.isna(value) else float(value)
+
+
+def reference_source(record, key):
+    if key in RESULT_REFERENCE:
+        return record.get("ref_src")
+    if key in LINE_REFERENCE:
+        return record.get("ref_ou_src")
+    return f"{record.get('ref_src')}~"
 
 
 def candidates(records, offers):
@@ -40,20 +63,27 @@ def candidates(records, offers):
         if offer.event_id not in info.index:
             continue
         record = info.loc[offer.event_id]
-        p_model, p_twin = record.get(offer.key), record.get(f"twin_{offer.key}")
-        if p_model is None or p_twin is None or pd.isna(p_model) or pd.isna(p_twin):
+        p_ref = number(record.get(f"ref_{offer.key}"))
+        if np.isnan(p_ref):
             continue
-        p_safe = min(float(p_model), float(p_twin))
         rows.append({"event_id": offer.event_id, "league": record["league"], "kickoff_utc": record["kickoff_utc"],
                      "home_team": record["home_team"], "away_team": record["away_team"], "key": offer.key,
-                     "odds": float(offer.odds), "mbs": int(offer.mbs or 1), "p_model": float(p_model), "p_twin": float(p_twin),
-                     "p_safe": p_safe, "p_book": book_probability(offer), "ratio": p_safe * float(offer.odds)})
+                     "odds": float(offer.odds), "mbs": int(offer.mbs or 1), "p_model": number(record.get(offer.key)),
+                     "p_twin": number(record.get(f"twin_{offer.key}")), "p_ref": p_ref,
+                     "ref_src": reference_source(record, offer.key), "p_book": book_probability(offer)})
     return pd.DataFrame(rows)
+
+
+def side_pool(cands, side):
+    if cands.empty:
+        return cands
+    pool = cands.assign(p_safe=cands[f"p_{side}"]).dropna(subset=["p_safe"])
+    return pool.assign(ratio=pool["p_safe"] * pool["odds"])
 
 
 def build(cands, odds, target, min_legs, max_legs, prefer=()):
     low, high = odds
-    pool = cands[cands["odds"].between(low, high) & (cands["p_safe"] >= cands["p_book"]) & (cands["mbs"] <= max_legs)]
+    pool = cands[cands["odds"].between(low, high) & (cands["p_safe"] >= cands["p_ref"]) & (cands["mbs"] <= max_legs)]
     pool = pool[~pool["key"].isin(SURPRISE_KEYS)].copy()
     pool["value"] = pool["ratio"] >= 1
     pool["preferred"] = pool["key"].isin(prefer)
@@ -73,7 +103,7 @@ def build(cands, odds, target, min_legs, max_legs, prefer=()):
 
 
 def surprises(cands, size=SURPRISE_SIZE):
-    pool = cands[cands["key"].isin(SURPRISE_KEYS)].sort_values(["ratio", "p_safe"], ascending=False)
+    pool = cands[cands["key"].isin(SURPRISE_KEYS) & (cands["p_safe"] >= cands["p_ref"])].sort_values(["ratio", "p_safe"], ascending=False)
     pool = pool.assign(value=pool["ratio"] >= 1)
     return pool.drop_duplicates(["event_id", "key"]).head(size).to_dict("records")
 
@@ -82,8 +112,11 @@ def make(records, offers):
     cands = candidates(records, offers)
     if cands.empty:
         return {}
-    made = {name: build(cands, **config) for name, config in COUPONS.items()}
-    made["surprise"] = surprises(cands)
+    made = {}
+    for side in SIDES:
+        pool = side_pool(cands, side)
+        made.update({f"{side}_{tier}": build(pool, **config) for tier, config in TIERS.items()})
+        made[f"{side}_surprise"] = surprises(pool)
     return made
 
 
@@ -95,8 +128,10 @@ def summary(legs):
 
 def ensure_schema(conn):
     conn.execute(SCHEMA)
-    if "p_book" not in {row[1] for row in conn.execute("PRAGMA table_info(coupon_log)")}:
-        conn.execute("ALTER TABLE coupon_log ADD COLUMN p_book REAL")
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(coupon_log)")}
+    for column, kind in ADDED_COLUMNS.items():
+        if column not in existing:
+            conn.execute(f"ALTER TABLE coupon_log ADD COLUMN {column} {kind}")
 
 
 def exists(day):
