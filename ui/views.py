@@ -2,7 +2,6 @@ import re
 from html import escape
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from data_pipeline.espn.leagues import LEAGUES
@@ -34,6 +33,8 @@ SURPRISES = [
 ]
 HTFT = [("İY 1", "1"), ("İY X", "X"), ("İY 2", "2")]
 SCORE = re.compile(r"(\d+-\d+)\((\d+)%\)")
+SOURCE_SHORT = {"b365": "B365", "dk": "DK"}
+SOURCE_NAME = {"b365": "Bet365", "dk": "DraftKings"}
 
 DOT = '<svg width="{s}" height="{s}" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="#38BDF8"/></svg>'
 DIAMOND = '<svg width="{s}" height="{s}" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="2" width="8" height="8" transform="rotate(45 6 6)" fill="#F59E0B"/></svg>'
@@ -89,7 +90,7 @@ def legend():
     return f"""<section class="ml-legend" aria-label="Kaynaklar">
 <div>{DOT.format(s=14)}<div><b class="ml-model">M · Model</b><small>Dixon-Coles. Sadece geçmiş maç verisi, oran görmez.</small></div></div>
 <div>{DIAMOND.format(s=14)}<div><b class="ml-twin">İ · Oran İkizleri</b><small>Aynı oranla açılmış 200 geçmiş maçta gerçekte ne oldu. AI yok.</small></div></div>
-<div>{TICK.format(s=14)}<div><b>P · Piyasa</b><small>Bet365, marjı temizlenmiş yüzde. Oranı olmayan maçta İkiz de yok.</small></div></div>
+<div>{TICK.format(s=14)}<div><b>P · Piyasa</b><small>Bet365, yoksa DraftKings; marjı temizlenmiş yüzde. Oranı olmayan maçta İkiz de yok.</small></div></div>
 </section>"""
 
 
@@ -102,19 +103,35 @@ def trio(record, key, edge):
         up = " ml-up" if p is not None and v - p >= edge else ""
         return f'<span class="{cls}{up}">{pct(v)}</span>'
 
-    market = '<span class="ml-dim">—</span>' if p is None else f"<span>{pct(p)}</span>"
+    approx = "~" if key == "over_2.5" and str(record.get("market_ou_src") or "").endswith("~") else ""
+    market = '<span class="ml-dim">—</span>' if p is None else f"<span>{approx}{pct(p)}</span>"
     return f'<div class="ml-trio">{span(m, "ml-model")}{span(t, "ml-twin")}{market}</div>'
 
 
+def market_prices(record):
+    prices = [data.value(record, f"market_odds_{side}") for side in ("home", "draw", "away")]
+    return None if None in prices else prices
+
+
+def market_line(record):
+    line, over, under = (data.value(record, f"market_line{k}") for k in ("", "_over", "_under"))
+    return None if None in (line, over, under) else (line, over, under, record.get("market_line_src"))
+
+
 def odds_cell(record):
-    prices = [data.value(record, c) for c in ("b365_home", "b365_draw", "b365_away")]
-    if None in prices:
+    prices = market_prices(record)
+    if prices is None:
         return '<div class="ml-r ml-mono ml-dim" style="font-size:14px">oran yok</div>'
+    tag = SOURCE_SHORT.get(record.get("market_src"), "")
     text = "  ".join(f"{p:.2f}" for p in prices)
-    line = data.value(record, "b365_goal_line")
-    over, under = data.value(record, "b365_over"), data.value(record, "b365_under")
-    sub = f"çizgi {line:g} · Ü {over:.2f} A {under:.2f}" if None not in (line, over, under) else ""
-    return f'<div class="ml-r ml-mono"><div style="font-size:14px;white-space:pre">{text}</div><div class="ml-muted" style="font-size:12px;margin-top:3px">{sub}</div></div>'
+    goal = market_line(record)
+    sub = ""
+    if goal:
+        line, over, under, src = goal
+        other = f" {SOURCE_SHORT.get(src, '')}" if src != record.get("market_src") else ""
+        sub = f"çizgi {line:g} · Ü {over:.2f} A {under:.2f}{other}"
+    return (f'<div class="ml-r ml-mono"><div style="font-size:14px;white-space:pre"><span class="ml-muted" style="font-size:11px">{tag}</span>  {text}</div>'
+            f'<div class="ml-muted" style="font-size:12px;margin-top:3px">{sub}</div></div>')
 
 
 def bulletin_table(records, day, edge):
@@ -138,9 +155,10 @@ def bulletin_table(records, day, edge):
             f'<div class="ml-xg">beklenen gol {r["lam_home"]:.2f} – {r["lam_away"]:.2f}</div></div>'
             f'{cells}{odds_cell(r)}</div>')
     note = (f'<p class="ml-note">Altı çizili kalın sayı: o kaynak piyasanın en az {round(100 * edge)} puan üstünde. '
-            f'Bet365 KG oranı vermiyor; gol çizgisi 2.5 değilse Üst 2.5 için piyasa yüzdesi yok.</p>')
+            f'Piyasa önce Bet365 (B365), yoksa DraftKings (DK). Hiçbir kaynakta 2.5 çizgisi yoksa Üst 2.5 Asya çizgisinden çevrilir (~). '
+            f'KG için piyasa oranı yok.</p>')
     return (f'<section class="ml-scroll" aria-label="Maçlar"><div class="ml-bulletin">'
-            f'<div class="ml-head"><span>Saat</span><span>Lig</span><span>Maç</span>{heads}<span class="ml-r">Bet365 1 · X · 2</span></div>'
+            f'<div class="ml-head"><span>Saat</span><span>Lig</span><span>Maç</span>{heads}<span class="ml-r">Piyasa 1 · X · 2</span></div>'
             f'{"".join(rows)}{note}</div></section>')
 
 
@@ -148,7 +166,7 @@ def agreement_section(hits, near, edge):
     points = round(100 * edge)
     head = (f'<div class="ml-section-head" style="border-top:1px solid #374151;margin-top:28px">'
             f'<h2 class="ml-h2">İki kaynak birden piyasanın üstünde</h2>'
-            f'<span class="ml-muted" style="font-size:14px">Model ve İkiz, Bet365\'i en az {points} puan aşıyor</span></div>')
+            f'<span class="ml-muted" style="font-size:14px">Model ve İkiz, piyasayı en az {points} puan aşıyor</span></div>')
 
     def label(row):
         home, away = teams(row["record"])
@@ -175,17 +193,21 @@ def match_header(record, back_href, back_label):
     local = record["kickoff_at"]
     league = LEAGUES.get(record["league"], "").upper()
     kicker = f'{league_short(record["league"])} · {league} · {DAYS[local.weekday()].upper()} {local:%H:%M}'
-    prices = [data.value(record, c) for c in ("b365_home", "b365_draw", "b365_away")]
-    if None in prices:
-        market = '<div class="ml-muted" style="font-size:15px">Bu maç için Bet365 oranı yok: İkiz ve Piyasa gösterilemiyor.</div>'
+    prices = market_prices(record)
+    if prices is None:
+        market = '<div class="ml-muted" style="font-size:15px">Bu maç için Bet365 ya da DraftKings oranı yok: İkiz ve Piyasa gösterilemiyor.</div>'
     else:
         boxes = "".join(f"<div><span>{lab}</span><b>{p:.2f}</b></div>" for lab, p in zip(("1", "X", "2"), prices))
         margin = sum(1 / p for p in prices) - 1
-        line = data.value(record, "b365_goal_line")
-        over, under = data.value(record, "b365_over"), data.value(record, "b365_under")
-        goal = f"gol çizgisi {line:g} · Ü {over:.2f} · A {under:.2f} · " if None not in (line, over, under) else ""
+        goal_line = market_line(record)
+        goal = ""
+        if goal_line:
+            line, over, under, src = goal_line
+            other = f" ({SOURCE_NAME.get(src, src)})" if src != record.get("market_src") else ""
+            goal = f"gol çizgisi {line:g} · Ü {over:.2f} · A {under:.2f}{other} · "
+        provider = SOURCE_NAME.get(record.get("market_src"), "Piyasa")
         market = (f'<div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end">'
-                  f'<span class="ml-kicker" style="font-size:14px">Bet365 · maç öncesi</span><div class="ml-odds">{boxes}</div>'
+                  f'<span class="ml-kicker" style="font-size:14px">{provider} · maç öncesi</span><div class="ml-odds">{boxes}</div>'
                   f'<span class="ml-mono ml-muted" style="font-size:13px">{goal}marj %{100 * margin:.1f}</span></div>')
     return (f'<a href="{back_href}" target="_self" class="ml-muted" style="display:inline-flex;align-items:center;gap:8px;min-height:44px">'
             f'<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>{back_label}</a>'
@@ -228,11 +250,15 @@ def three_sources(record):
                     f'<span class="ml-r ml-model">{pct(m, 1)}</span><span class="ml-r ml-twin">{pct(t, 1)}</span>'
                     f'<span class="ml-r {"ml-dim" if p is None else ""}">{pct(p, 1)}</span></div>')
     head = (f'<div class="ml-section-head"><h2 class="ml-h2">Üç kaynak, aynı ölçek</h2>'
-            f'{keys((DOT.format(s=12), "Model"), (DIAMOND.format(s=12), "İkiz (200 maç)"), (TICK.format(s=12), "Piyasa (Bet365 marjsız)"))}</div>')
-    note = "Çifte şans piyasa yüzdesi marjsız 1X2'den."
-    if data.value(record, "market_over_2.5") is None:
-        line = data.value(record, "b365_goal_line")
-        note += f" Gol marketlerinde piyasa yok: Bet365 bu maç için 2.5 değil, {line:g} Asya çizgisi açtı." if line else " Gol marketlerinde piyasa yok."
+            f'{keys((DOT.format(s=12), "Model"), (DIAMOND.format(s=12), "İkiz (200 maç)"), (TICK.format(s=12), "Piyasa (marjsız)"))}</div>')
+    note = f"Piyasa: {SOURCE_NAME.get(record.get('market_src'), 'yok')}. Çifte şans piyasa yüzdesi marjsız 1X2'den."
+    ou_src = str(record.get("market_ou_src") or "")
+    goal_line = market_line(record)
+    if ou_src.endswith("~") and goal_line:
+        note += f" Üst 2.5 piyasası {SOURCE_NAME.get(goal_line[3], '')} {goal_line[0]:g} Asya çizgisinden çevrildi."
+    elif ou_src and ou_src != record.get("market_src"):
+        note += f" Üst 2.5 piyasası {SOURCE_NAME.get(ou_src, ou_src)} 2.5 çizgisinden."
+    note += " Diğer gol marketlerinde piyasa oranı yok."
     return (f'<section>{head}<div class="ml-scroll"><div class="ml-strips">'
             f'<div class="ml-head"><span>Market</span>{scale_head()}<span class="ml-r ml-model">Model</span>'
             f'<span class="ml-r ml-twin">İkiz</span><span class="ml-r">Piyasa</span></div>{"".join(rows)}</div></div>'
@@ -320,9 +346,9 @@ def twin_header(record, summary):
             f'<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Maç detayı</a>'
             f'<div class="ml-match-head"><div><div class="ml-kicker ml-twin" style="color:#F59E0B">Oran İkizleri · {summary["n"]} maç</div>'
             f'<h1 class="ml-teams"><span>{home}</span><i aria-label="karşı">–</i><span>{away}</span></h1>'
-            f'<span class="ml-muted" style="font-size:16px">Bet365\'in bu maça açtığı fiyata en çok benzeyen, {local.day} {MONTHS[local.month - 1]}\'dan '
+            f'<span class="ml-muted" style="font-size:16px">{SOURCE_NAME.get(record.get("market_src"), "Piyasa")} fiyatına en çok benzeyen, {local.day} {MONTHS[local.month - 1]}\'dan '
             f'önce oynanmış {summary["n"]} maç. Model yok, sadece gerçek sonuçlar.</span></div>'
-            f'<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end"><span class="ml-kicker" style="font-size:14px">Arama noktası · Bet365 marjsız</span>'
+            f'<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end"><span class="ml-kicker" style="font-size:14px">Arama noktası · {SOURCE_NAME.get(record.get("market_src"), "piyasa")} marjsız</span>'
             f'<div class="ml-mono" style="display:flex;gap:28px;font-size:22px">{values}</div></div></div>')
 
 

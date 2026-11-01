@@ -22,16 +22,17 @@ CREATE TABLE IF NOT EXISTS prediction_log (
 """
 UPSERT = """
 INSERT INTO prediction_log (event_id, market, league, kickoff_utc, home_team, away_team, lam_home, lam_away,
-                            model_p, twin_p, market_p, line, b365, ev, logged_at)
+                            model_p, twin_p, market_p, market_src, line, b365, ev, logged_at)
 VALUES (:event_id, :market, :league, :kickoff_utc, :home_team, :away_team, :lam_home, :lam_away,
-        :model_p, :twin_p, :market_p, :line, :b365, :ev, :logged_at)
+        :model_p, :twin_p, :market_p, :market_src, :line, :b365, :ev, :logged_at)
 ON CONFLICT(event_id, market) DO UPDATE SET
     kickoff_utc = excluded.kickoff_utc, lam_home = excluded.lam_home, lam_away = excluded.lam_away,
-    model_p = excluded.model_p, twin_p = excluded.twin_p, market_p = excluded.market_p, line = excluded.line, b365 = excluded.b365, ev = excluded.ev,
+    model_p = excluded.model_p, twin_p = excluded.twin_p, market_p = excluded.market_p, market_src = excluded.market_src, line = excluded.line, b365 = excluded.b365, ev = excluded.ev,
     logged_at = excluded.logged_at
 WHERE prediction_log.settled_at IS NULL
 """
-MIGRATIONS = {"twin_p": "REAL", "market_p": "REAL"}
+MIGRATIONS = {"twin_p": "REAL", "market_p": "REAL", "market_src": "TEXT"}
+RESULT_MARKETS = {"home", "draw", "away"}
 MATCH_FIELDS = ["event_id", "league", "kickoff_utc", "home_team", "away_team", "lam_home", "lam_away"]
 
 
@@ -49,6 +50,14 @@ def clean(value):
     return float(value) if isinstance(value, (np.floating, np.integer)) else value
 
 
+def market_source(record, market):
+    if market in RESULT_MARKETS:
+        return record.get("market_src")
+    if market == "over_2.5":
+        return record.get("market_ou_src")
+    return None
+
+
 def prediction_rows(records, candidates, logged_at):
     priced = {}
     if not candidates.empty:
@@ -59,14 +68,14 @@ def prediction_rows(records, candidates, logged_at):
         for market in LOG_MARKETS:
             offer = priced.get((record["event_id"], market), {})
             rows.append({**base, "market": market, "model_p": record[market], "twin_p": record.get(f"twin_{market}"),
-                         "market_p": record.get(f"market_{market}"), "line": None,
+                         "market_p": record.get(f"market_{market}"), "market_src": market_source(record, market), "line": None,
                          "b365": offer.get("b365"), "ev": offer.get("ev"), "logged_at": logged_at})
     if not candidates.empty:
         meta = records.set_index("event_id")[["lam_home", "lam_away"]].to_dict("index")
         for offer in candidates[candidates["key"].str.startswith("asian_")].to_dict("records"):
             base = {field: offer.get(field) for field in MATCH_FIELDS[:5]}
             rows.append({**base, **meta[offer["event_id"]], "market": offer["key"], "model_p": None, "twin_p": None, "market_p": None,
-                         "line": offer["line"], "b365": offer["b365"], "ev": offer["ev"], "logged_at": logged_at})
+                         "market_src": None, "line": offer["line"], "b365": offer["b365"], "ev": offer["ev"], "logged_at": logged_at})
     return [{k: clean(v) for k, v in row.items()} for row in rows]
 
 

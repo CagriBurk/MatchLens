@@ -115,7 +115,9 @@
 - [x] `ui/data.py` (veri), `ui/views.py` (HTML), `ui/theme.css` (tüm renk/font tokenları tek yerde), `ui/pages/` (Bülten, Maç detayı, Oran İkizleri), `ui/picker.py` (maç seçimi, `?event=` parametresi). Başlatma: `scripts/run_ui.ps1` → http://localhost:8501.
 - [x] `twins_pool`'a `home_team` / `away_team` eklendi; `TwinFinder.twin_table` 200 ikizi uzaklıkla listeler.
 - Not: arayüz metinleri Türkçe (kullanıcıya dönük kopya); kod içi log/print İngilizce kuralı aynen geçerli.
-- [ ] Sonraki: Karne ekranı (prediction_log isabeti), tasarım revizyonu (işler bitince).
+- [x] **Piyasa kapsamı (2026-11-01):** ESPN summary'lerinde DraftKings oranı var (1X2 + standart Üst/Alt 2.5, açılış/kapanış; 2025 sonundan beri, 2026'da 12 ligin hepsinde %91-100). Kalite: 1.901 ortak maçta 1X2 log-loss DK kapanış 0.9955 / Bet365 0.9965, marj %6.1 / %6.6; sızıntı yok (hiçbir maçta p>0.95). Karar (Çağrı): piyasa market bazında önce Bet365, yoksa DraftKings; hiçbir kaynakta 2.5 çizgisi yoksa Asya çizgisi `market_lambda` ile Üst 2.5'e çevrilir (`~`). `prediction_log.market_src` (b365 / dk / b365~ / dk~). Sonuç: önümüzdeki 62 maçta piyasa+ikiz 27 → 60, Üst 2.5 piyasası 5 → 60.
+- [ ] DraftKings geçmişini (~3.7k maç) `twins_pool`'a ve kalibrasyona eklemek (isteğe bağlı).
+- [ ] Sonraki: Karne ekranı (prediction_log isabeti, kaynak bazında), tasarım revizyonu (işler bitince).
 
 ## 📌 Aşama 5: Streamlit "5 Ekranlı Pro Karar Destek Platformu" Arayüzü
 - [ ] **Ekran 1 — Günün AI Fırsatları (Vitrin):** `Oran >= 1.50` ve yüksek Edge filtreli, 3/3 Üçlü Onay rozetli öne çıkan maçlar.

@@ -4,6 +4,7 @@ from fractions import Fraction
 MINUTE_PATTERN = re.compile(r"(\d+)'(?:\+(\d+)')?")
 GOAL_TYPES = ("goal", "penalty_goal", "own_goal")
 BET365_PROVIDER = "Bet 365"
+DRAFTKINGS_PROVIDER = "DraftKings"
 BET365_FIELDS = {
     "preMatchFullTimeResultHome": "b365_home",
     "preMatchFullTimeResultDraw": "b365_draw",
@@ -130,6 +131,35 @@ def parse_bet365_odds(summary: dict, event_id: str):
         for source, target in BET365_FIELDS.items():
             row[target] = fractional_to_decimal((team_odds.get(source) or {}).get("value"))
         row["b365_goal_line"] = to_float((team_odds.get("preMatchOverUnderHandicap") or {}).get("value"))
+        return row
+    return None
+
+
+def american_to_decimal(value):
+    number = to_float(str(value).replace("+", "")) if value is not None else None
+    if not number:
+        return None
+    return round(1 + (number / 100 if number > 0 else 100 / -number), 4)
+
+
+def parse_draftkings_odds(summary: dict, event_id: str):
+    for provider in summary.get("odds") or []:
+        if provider.get("provider", {}).get("name") != DRAFTKINGS_PROVIDER:
+            continue
+        moneyline, total = provider.get("moneyline") or {}, provider.get("total") or {}
+
+        def close(block, side, field="odds"):
+            return ((block.get(side) or {}).get("close") or {}).get(field)
+
+        row = {"event_id": event_id}
+        for side in ("home", "draw", "away"):
+            row[f"dk_{side}"] = american_to_decimal(close(moneyline, side))
+        if not all(row[f"dk_{side}"] for side in ("home", "draw", "away")):
+            return None
+        line_text = close(total, "over", "line")
+        row["dk_goal_line"] = to_float(line_text[1:]) if line_text else to_float(provider.get("overUnder"))
+        row["dk_over"] = american_to_decimal(close(total, "over"))
+        row["dk_under"] = american_to_decimal(close(total, "under"))
         return row
     return None
 

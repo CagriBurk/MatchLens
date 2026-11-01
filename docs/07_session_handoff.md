@@ -17,7 +17,7 @@ Yeni oturum önce bunu, sonra `docs/03_roadmap.md` ve `.agents/AGENTS.md` dosyal
 Bet365 oranı modele **girmez**. Her maç için üç bağımsız bilgi yan yana:
 - **A: Oran İkizleri** (`matchlens/twins.py`): AI yok. Marjsız (1, 2, Üst 2.5) yüzdelerine en yakın, maçtan önce oynanmış 200 geçmiş maçın gerçek sonuçları (1X2, Alt/Üst, KG, İY/MS, iki yarı marketleri, 6+, 0-15 dk, en sık skorlar).
 - **B: AI modeli** (`matchlens/dixon_coles.py` + `markets.py`): sadece geçmiş maç verisi. Lig bazlı, zaman ağırlıklı, ridge'li Dixon-Coles; ikinci yarı skor durumuna bağlı (İY/MS 1/2-2/1 düzeltmesi).
-- **Piyasa**: Bet365 marjsız yüzdesi.
+- **Piyasa**: Bet365 marjsız yüzdesi; yoksa DraftKings (ESPN summary'sinden). Üst 2.5 çizgisi yoksa Asya çizgisinden çevrilir.
 - Son katman: "A ve B ikisi de piyasadan yüksek" listesi (bilgi amaçlı).
 
 ## 4. Komutlar

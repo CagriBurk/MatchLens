@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime
+from functools import lru_cache
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -11,11 +12,12 @@ from data_pipeline.espn.leagues import LEAGUES
 from data_pipeline.ingest_espn import current_year
 from matchlens import dixon_coles, markets, odds, twins
 from matchlens.data import finished, load_matches
-from matchlens.market_lambda import fair_three_way, fair_two_way
+from matchlens.market_lambda import DEFAULT_RHO, ImpliedLambda, fair_three_way, fair_two_way
 
 LOCAL_TZ = ZoneInfo("Europe/Istanbul")
 BULLETIN_DIR = DATA_DIR / "bulletins"
 MIN_EV = 0.03
+MARKET_SOURCES = ("b365", "dk")
 MAX_ODDS = 6.0
 AGREEMENT_EDGE = 0.04
 ODDS_MARKETS = [
@@ -53,21 +55,55 @@ def fetch_odds(day):
     rows = {}
     for match in day.itertuples():
         summary = client.fetch_summary(match.league, match.event_id)
-        row = parse.parse_bet365_odds(summary or {}, match.event_id)
-        if row:
-            rows[match.event_id] = row
+        b365 = parse.parse_bet365_odds(summary or {}, match.event_id) or {}
+        dk = parse.parse_draftkings_odds(summary or {}, match.event_id) or {}
+        if b365 or dk:
+            rows[match.event_id] = {**b365, **dk}
     return rows
 
 
+@lru_cache(maxsize=1)
+def implied_lambda():
+    return ImpliedLambda()
+
+
+def over25_from_line(p_home, p_away, p_over_line, line):
+    lam_h, lam_a = implied_lambda().solve([p_home], [p_away], [p_over_line], line=line)
+    totals = markets.total_distribution(markets.score_matrix(lam_h[0], lam_a[0], DEFAULT_RHO))
+    return markets.over_prob(totals, 2.5)
+
+
+def goal_lines(odds_row):
+    lines = []
+    for src in MARKET_SOURCES:
+        line, over, under = (odds_row.get(f"{src}_{k}") for k in ("goal_line", "over", "under"))
+        if line is not None and not pd.isna(line) and over and under:
+            lines.append((src, float(line), over, under))
+    return lines
+
+
 def market_view(odds_row):
-    prices = [odds_row.get(key) for key in ("b365_home", "b365_draw", "b365_away")]
-    if not all(prices):
+    for src in MARKET_SOURCES:
+        prices = [odds_row.get(f"{src}_{side}") for side in ("home", "draw", "away")]
+        if all(prices):
+            break
+    else:
         return {}
     fair = fair_three_way([prices[0]], [prices[1]], [prices[2]])[0]
-    view = {"market_home": fair[0], "market_draw": fair[1], "market_away": fair[2]}
-    line, over, under = odds_row.get("b365_goal_line"), odds_row.get("b365_over"), odds_row.get("b365_under")
-    if line == 2.5 and over and under:
-        view["market_over_2.5"] = float(fair_two_way(over, under))
+    view = {"market_home": fair[0], "market_draw": fair[1], "market_away": fair[2], "market_src": src,
+            "market_odds_home": prices[0], "market_odds_draw": prices[1], "market_odds_away": prices[2]}
+    lines = goal_lines(odds_row)
+    exact = [entry for entry in lines if entry[0] == src and entry[1] == 2.5] or [entry for entry in lines if entry[1] == 2.5]
+    chosen = exact[0] if exact else (lines[0] if lines else None)
+    if chosen is None:
+        return view
+    line_src, line, over, under = chosen
+    view.update({"market_line": line, "market_line_over": over, "market_line_under": under, "market_line_src": line_src})
+    p_line = float(fair_two_way(over, under))
+    if line == 2.5:
+        view["market_over_2.5"], view["market_ou_src"] = p_line, line_src
+    else:
+        view["market_over_2.5"], view["market_ou_src"] = over25_from_line(fair[0], fair[2], p_line, line), f"{line_src}~"
     return view
 
 
