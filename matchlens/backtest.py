@@ -5,7 +5,7 @@ import pandas as pd
 
 from data_pipeline.db import connect
 from data_pipeline.espn.leagues import LEAGUES
-from matchlens import dixon_coles, goal_calibration, health, markets, odds
+from matchlens import dixon_coles, goal_calibration, markets, odds
 from matchlens.data import finished, load_matches
 
 DEFAULT_START = "2019-07-01"
@@ -126,7 +126,7 @@ def betting_report(df, thresholds=EV_THRESHOLDS):
     return pd.DataFrame(rows), bets
 
 
-def run(leagues, start, xi, ridge, save=True, ridge_style=dixon_coles.RIDGE_STYLE, snapshot=None):
+def run(leagues, start, xi, ridge, save=True, ridge_style=dixon_coles.RIDGE_STYLE):
     matches = load_matches(leagues)
     preds = add_market_probs(walk_forward(matches, start, xi, ridge, ridge_style=ridge_style))
     try:
@@ -134,9 +134,7 @@ def run(leagues, start, xi, ridge, save=True, ridge_style=dixon_coles.RIDGE_STYL
     except Exception:
         for col in ("b365_home", "b365_draw", "b365_away", "b365_over", "b365_under", "b365_goal_line"):
             preds[col] = np.nan
-    if snapshot:
-        health.save_snapshot(preds, snapshot)
-    elif save:
+    if save:
         with connect() as conn:
             preds.drop(columns=["totals"]).to_sql("backtest_predictions", conn, if_exists="replace", index=False)
         goal_calibration.refresh()
@@ -159,9 +157,8 @@ def main():
     parser.add_argument("--xi", type=float, default=dixon_coles.XI)
     parser.add_argument("--ridge", type=float, default=dixon_coles.RIDGE)
     parser.add_argument("--ridge-style", type=float, default=dixon_coles.RIDGE_STYLE)
-    parser.add_argument("--snapshot", help="write predictions to data/backtests/<name>.pkl only (no DB, no goal weights)")
     args = parser.parse_args()
-    print_reports(run(args.leagues, args.start, args.xi, args.ridge, ridge_style=args.ridge_style, snapshot=args.snapshot))
+    print_reports(run(args.leagues, args.start, args.xi, args.ridge, ridge_style=args.ridge_style))
 
 
 if __name__ == "__main__":
