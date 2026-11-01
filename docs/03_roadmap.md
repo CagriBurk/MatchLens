@@ -122,7 +122,9 @@
   - Kombolar (`matchlens/selections.py`): MS&KG, MS&1.5/2.5 Alt-Üst, KG&2.5 Alt-Üst; model skor matrisinden, ikizler 200 maçtan aynı tanımla.
   - Kural: güvenli olasılık = min(Model, İkiz); seçim şartı güvenli olasılık ≥ İddaa marjsız yüzdesi (esnek); DEĞER etiketi güvenli × oran ≥ 1. Kupon başına bir maç, MBS kuralı. Mavi 1.35-1.65 / hedef tutma ≥%20, Sarı 1.70-2.40 / ≥%6, Kırmızı 2.50-4.50 / ≥%2 (2-4 seçim, MS kombo öncelikli), Sürpriz: 6+, İY/MS 1/2-2/1, iki yarı 1.5 Üst'ten en iyi 10 aday.
   - İlk gözlem: İddaa marjı Üst/KG Var tarafında yoğun; seçimler Alt/KG Yok ağırlıklı çıkıyor, DEĞER'li seçim nadir.
-- [ ] Sonraki: Karne ekranı (prediction_log + coupon_log isabeti, kaynak bazında), tasarım revizyonu (işler bitince).
+- [x] **Karne (2026-11-01):** 5. sekme (`matchlens/scorecard.py`, `ui/pages/scorecard.py`). Üç kaynağın aynı satırlarda Brier/log-loss kıyası, market bazında tablo (en iyi kaynak işaretli), kalibrasyon (kaynak seçilebilir), Bet365 vs DraftKings, kupon karnesi (tutma oranı vs beklenen, düz 1 birim ROI, seçim isabeti) ve kupon geçmişi.
+- [ ] Kuponları ikiye bölmek (Çağrı, 2026-11-01: makinenin seçimleri beğenilmedi): "Modelin seçtikleri" ve "İkiz oran" kuponları ayrı.
+- [ ] Tasarım revizyonu (işler bitince).
 
 ## 📌 Aşama 5: Streamlit "5 Ekranlı Pro Karar Destek Platformu" Arayüzü
 - [ ] **Ekran 1 — Günün AI Fırsatları (Vitrin):** `Oran >= 1.50` ve yüksek Edge filtreli, 3/3 Üçlü Onay rozetli öne çıkan maçlar.

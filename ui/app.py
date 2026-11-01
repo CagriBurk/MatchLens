@@ -19,6 +19,7 @@ navigation = st.navigation(
         st.Page(PAGES / "match.py", title="Maç detayı", url_path="mac"),
         st.Page(PAGES / "twins.py", title="Oran İkizleri", url_path="ikizler"),
         st.Page(PAGES / "coupons.py", title="Kuponlar", url_path="kuponlar"),
+        st.Page(PAGES / "scorecard.py", title="Karne", url_path="karne"),
     ],
     position="top",
 )
