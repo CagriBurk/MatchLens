@@ -40,6 +40,7 @@ powershell -File scripts\run_ui.ps1
 - ESPN 12 lig 2016-2026 (`espn_*`, summary backfill tamam, Bet365 oranlı ~20k maç). Kaggle (`kaggle_matches`), FootyStats (`footystats_matches`, üyelik bitmek üzere), `team_name_map`.
 - `twins_pool` (144.8k, takım isimli), `twins_backtest` (ESPN maçları için sızıntısız ikiz frekansları; sütunlar sayım, `_n` ile böl), `backtest_predictions` (model walk-forward 2019-07+), `prediction_log` (model_p/twin_p/market_p/market_src), `nesine_odds` (event_id, key, odds, mbs, fair), `coupon_log`.
 - `data/model/goal_weights.json`, `data/raw/nesine/` (günlük ~1.8 MB), `data/reports/health_*.md|json`.
+- `data/raw/kaggle/odds_movements/` (2026-11-01, ~300 MB parquet: matches, match_closing, odds_1x2, odds_ou, odds_ah; Kaggle archangel0x01/football-odds-movements-2018-2026) — v2 Smart Money için, henüz kullanılmıyor.
 
 ## 6. Dürüst Durum
 - Model 1X2'de iyi kalibre ama Bet365'ten zayıf (Bet365 oranlı maçlarda log-loss 1.0067 vs 0.988). Hiçbir bahis kuralı tarihsel olarak kâr etmiyor; İddaa marjı ~%15-19 (Üst/KG Var tarafına daha çok yüklü).
