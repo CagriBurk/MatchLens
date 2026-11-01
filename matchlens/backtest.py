@@ -5,7 +5,7 @@ import pandas as pd
 
 from data_pipeline.db import connect
 from data_pipeline.espn.leagues import LEAGUES
-from matchlens import dixon_coles, markets, odds
+from matchlens import dixon_coles, goal_calibration, markets, odds
 from matchlens.data import finished, load_matches
 
 DEFAULT_START = "2019-07-01"
@@ -136,6 +136,7 @@ def run(leagues, start, xi, ridge, save=True):
     if save:
         with connect() as conn:
             preds.drop(columns=["totals"]).to_sql("backtest_predictions", conn, if_exists="replace", index=False)
+        goal_calibration.refresh()
     return preds
 
 

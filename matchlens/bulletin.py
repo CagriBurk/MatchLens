@@ -10,7 +10,7 @@ from data_pipeline.config import DATA_DIR
 from data_pipeline.espn import client, parse
 from data_pipeline.espn.leagues import LEAGUES
 from data_pipeline.ingest_espn import current_year
-from matchlens import dixon_coles, markets, odds, twins
+from matchlens import dixon_coles, goal_calibration, markets, odds, twins
 from matchlens.data import finished, load_matches
 from matchlens.market_lambda import DEFAULT_RHO, ImpliedLambda, fair_three_way, fair_two_way
 
@@ -116,9 +116,9 @@ def twin_view(finder, market, kickoff):
     return view
 
 
-def evaluate_match(match, model, odds_row, finder):
+def evaluate_match(match, model, odds_row, finder, goal_weights=None):
     lam_h, lam_a = model.expected_goals(match.home_team_id, match.away_team_id)
-    probs, matrix = markets.market_probs(lam_h, lam_a, model.rho, model.shares)
+    probs, matrix = markets.market_probs(lam_h, lam_a, model.rho, model.shares, goal_weights=goal_weights)
     totals = markets.total_distribution(matrix)
     kickoff = match.kickoff.tz_convert(LOCAL_TZ).strftime("%H:%M")
     base = {"event_id": match.event_id, "league": match.league, "kickoff": kickoff, "kickoff_utc": match.kickoff_utc,
@@ -150,12 +150,13 @@ def build(dates, leagues, refresh=True):
         return pd.DataFrame(), pd.DataFrame()
     odds_rows = fetch_odds(day)
     finder = twins.TwinFinder(twins.load_pool())
+    goal_weights = goal_calibration.load()
     now = pd.Timestamp.now(tz="UTC")
     records, candidates = [], []
     for league, league_day in day.groupby("league"):
         model = dixon_coles.fit(finished(matches[matches["league"].eq(league)]), now)
         for match in league_day.itertuples():
-            record, cands = evaluate_match(match, model, odds_rows.get(match.event_id), finder)
+            record, cands = evaluate_match(match, model, odds_rows.get(match.event_id), finder, goal_weights)
             records.append(record)
             candidates.extend(cands)
     return pd.DataFrame(records), pd.DataFrame(candidates)

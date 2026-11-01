@@ -6,6 +6,7 @@ from matchlens import selections
 MAX_GOALS = 10
 MAX_HALF_GOALS = 8
 TOTAL_LINES = (1.5, 2.5, 3.5, 4.5)
+GOAL_GROUP_MAX = 7
 STATE_FACTORS = {"lead": 0.943, "trail": 1.088, "level": 0.960}
 NO_STATE_EFFECT = {"lead": 1.0, "trail": 1.0, "level": 1.0}
 
@@ -23,6 +24,20 @@ def score_matrix(lam_home, lam_away, rho=0.0, max_goals=MAX_GOALS):
     matrix[1, 0] *= 1 + lam_away * rho
     matrix[1, 1] *= 1 - rho
     return matrix / matrix.sum()
+
+
+def goal_groups(size):
+    goals = np.arange(size)
+    total = np.minimum(goals[:, None] + goals[None, :], GOAL_GROUP_MAX)
+    both = (goals[:, None] > 0) & (goals[None, :] > 0)
+    return total + (GOAL_GROUP_MAX + 1) * both
+
+
+def reweight(matrix, weights):
+    if weights is None:
+        return matrix
+    adjusted = matrix * np.asarray(weights)[goal_groups(matrix.shape[0])]
+    return adjusted / adjusted.sum()
 
 
 def result_probs(matrix):
@@ -88,8 +103,8 @@ def ht_ft_probs(first, seconds):
     return probs
 
 
-def market_probs(lam_home, lam_away, rho, shares, state_factors=None):
-    matrix = score_matrix(lam_home, lam_away, rho)
+def market_probs(lam_home, lam_away, rho, shares, state_factors=None, goal_weights=None):
+    matrix = reweight(score_matrix(lam_home, lam_away, rho), goal_weights)
     totals = total_distribution(matrix)
     home, draw, away = result_probs(matrix)
     first, seconds = half_matrices(lam_home, lam_away, shares, state_factors)

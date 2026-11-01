@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from matchlens import markets, twins
+from matchlens import goal_calibration, markets, twins
 from matchlens.bulletin import AGREEMENT_EDGE, BULLETIN_DIR, LOCAL_TZ
 
 SNAPSHOT = re.compile(r"^(\d{4}-\d{2}-\d{2})_matches\.csv$")
@@ -81,7 +81,7 @@ def agreements(records, edge=EDGE):
 
 def score_grid(record, size=6):
     rho = value(record, "rho") or 0.0
-    matrix = markets.score_matrix(record["lam_home"], record["lam_away"], rho)
+    matrix = markets.reweight(markets.score_matrix(record["lam_home"], record["lam_away"], rho), goal_calibration.load())
     grid = matrix[:size, :size].copy()
     grid[size - 1, :] += matrix[size:, :size].sum(axis=0)
     grid[:, size - 1] += matrix[:size, size:].sum(axis=1)
