@@ -46,10 +46,13 @@ powershell -File scripts\run_ui.ps1
 - **Bilinen kalibrasyon sorunu (ridge 5):** gol toplamı fazla açılıyor (gerçek/tahmin toplam eğimi 0.77); Üst/KG eğimleri 0.65-0.80; kuponlardaki Alt yığılmasının kaynağı. Ayrık ridge (güç 3 / stil 30) bunu düzeltiyor (eğimler 0.95-1.03, ayar FAIL 9→1) ama son sınavda gol log-loss kazancı (−0.0036) istatistiksel olarak yetmedi → yeni kapı RET, Çağrı kuralı uyguladı ve geri alındı. Snapshot: `data/backtests/split30.pkl` ve `ridge5.pkl`.
 - **Yeni sağlık kapısı** (ayrıntı roadmap Adım 2): karar eşleştirilmiş log-loss farkıyla (haftalık blok bootstrap GA), kalibrasyon z-skorlu FAIL/WARN. Kural sonuç görmeden sabitlendi ve güç simülasyonuyla doğrulandı; değiştirilmeyecek.
 - **2026 kayması:** aslında 2026/27 sezon başı: Tem-Eki 3.08 gol/maç (tarihsel 2.66-2.82), artış normal oyun süresine yayılmış, çoğu ligde (ita.1 2.56→3.20, bel.1 2.71→3.20), Bet365 de kaçırdı → geçmiş veriden öngörülemez şok; kısmen yakalanabilir.
+- **Mevsimsellik ve seviye takipçisi (Adım 3) de denendi, ikisi de kapıdan RET** (gol GA'ları sıfırı geçiyor; ayrıntı roadmap). Takipçi Ü2.5 seviye sapmasını yarıya indiriyor ama kanıtlanabilir log-loss kazancı yok. Son sınav üç kez görüldü; artık yeni adaylar için bağımsız veri lazım.
 - KG: sezon bazında eğim 0.58-1.10 dalgalı (SE ≈0.13); FootyStats piyasası KG'de modelden iyi (modelde olmayan maç bilgisi). Ek KG katmanı/NegBin/iki değişkenli Poisson denenmeyecek.
 
 ## 7. Sıradaki İş
-1. **Mevsimsellik:** ay (veya takvim grubu: Avrupa / usa+nor) bazında gol seviyesi çarpanı λ·exp(δ_ay), katsayılar walk-forward içinde yalnız geçmiş veriden (genişleyen pencere). Denetçi ön testi: iç doğrulamada gol log-loss −20.5e-4, son sınavda −7e-4. Taban `ridge5` snapshot, karar yeni kapıyla (`health --preds X --against ridge5`).
-2. **Adım 3:** havuzlu (ligler arası), tek parametreli, muhafazakâr seviye takipçisi (λ·exp(δ_t)); seçim kuralı önceden: ayar döneminde en iyi olandan 1 SE içindeki en yavaş. Beklenti düşük: 2026 sonbahar Ü2.5 sapması −5.9 → ≈−3 puan.
-3. Sonra: kuponları Model/İkiz olarak ikiye bölmek ve kupon şartında referansı Bet365/DK yapmak. Son faz (v3): canlı bildirim.
-- Not: 01.11 tahminleri/kuponları ridge 5 ile üretildi (üretim modeli hiç değişmemiş sayılır; arada sadece ~1 saat 3:30 vardı, update o arada çalışmadı).
+1. **Karar bekliyor — gölge kayıt:** split30 ve level τ=30 adaylarını günlük update'te ürünü etkilemeden ayrı kaynak olarak kaydetmek (ör. `prediction_log`'a `model_variant` veya ayrı tablo); 2-3 ay sonra (≈1.500+ maç) bağımsız ileri veride aynı kapıyla (`health` eşleştirilmiş karşılaştırma) karar. Son sınav dönemi artık "görülmüş" sayılır.
+2. Kuponları Model/İkiz olarak ikiye bölmek ve kupon şartında referansı Bet365/DK yapmak (Çağrı'nın isteği, bekliyor).
+3. Son faz (v3): canlı bildirim (roadmap Aşama 7).
+- Kapı kuralı (değiştirilmeyecek): son sınavda aday − taban maç başı log-loss, haftalık blok bootstrap %95 GA; KABUL = en az bir grupta (1X2 / gol) üst uç < 0 ve tüm gruplarda üst uç ≤ +5e-4.
+- `matchlens/seasonality.py` ve `matchlens/level.py` üretimde kullanılmıyor (deney modülleri, testli).
+- Not: 01.11 tahminleri/kuponları ridge 5 ile üretildi; üretim modeli bu oturumda net olarak değişmedi.
