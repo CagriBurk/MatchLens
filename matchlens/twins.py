@@ -331,9 +331,17 @@ def roi_table(all_bets, by="side"):
     return pd.DataFrame(rows).pivot_table(index=by, columns="min_edge", values=["bets", "roi"])
 
 
+def save_backtest(result):
+    linked = result[result["event_id"].notna()]
+    columns = ["event_id", "source", "p_home", "p_draw", "p_away", "p_over25"] + [c for c in result.columns if c.startswith("twin_")]
+    with connect() as conn:
+        linked[columns].assign(event_id=linked["event_id"].astype(str)).to_sql("twins_backtest", conn, if_exists="replace", index=False)
+
+
 def run_backtest():
     finder = TwinFinder(load_pool())
     result = walk_forward(finder)
+    save_backtest(result)
     all_bets = bets(result)
     with pd.option_context("display.width", 220, "display.max_rows", 200):
         print({k: round(v, 4) if isinstance(v, float) else v for k, v in accuracy(result).items()})

@@ -140,7 +140,7 @@ def top_scores(matrix, k=3):
     return [(int(i), int(j), float(matrix[i, j])) for i, j in zip(*np.unravel_index(flat, matrix.shape))]
 
 
-def core_probs(lam_home, lam_away, rho, max_goals=MAX_GOALS):
+def score_matrices(lam_home, lam_away, rho, max_goals=MAX_GOALS, goal_weights=None):
     lam_home, lam_away = np.asarray(lam_home, dtype=float), np.asarray(lam_away, dtype=float)
     rho = np.broadcast_to(np.asarray(rho, dtype=float), lam_home.shape)
     goals = np.arange(max_goals + 1)
@@ -153,7 +153,14 @@ def core_probs(lam_home, lam_away, rho, max_goals=MAX_GOALS):
     matrix[:, 0, 1] *= 1 + lam_home * rho
     matrix[:, 1, 0] *= 1 + lam_away * rho
     matrix[:, 1, 1] *= 1 - rho
-    matrix /= matrix.sum(axis=(1, 2), keepdims=True)
+    if goal_weights is not None:
+        matrix *= np.asarray(goal_weights)[goal_groups(max_goals + 1)][None, :, :]
+    return matrix / matrix.sum(axis=(1, 2), keepdims=True)
+
+
+def core_probs(lam_home, lam_away, rho, max_goals=MAX_GOALS):
+    matrix = score_matrices(lam_home, lam_away, rho, max_goals)
+    goals = np.arange(max_goals + 1)
     diff = goals[:, None] - goals[None, :]
     total = goals[:, None] + goals[None, :]
     probs = {
