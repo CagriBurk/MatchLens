@@ -5,8 +5,8 @@ import pandas as pd
 from scipy.optimize import minimize
 
 XI = 0.0019
-RIDGE = 3.0
-RIDGE_STYLE = 30.0
+RIDGE = 5.0
+RIDGE_STYLE = None
 WINDOW_DAYS = 1460
 NEWCOMER_PRIOR = -0.15
 NEWCOMER_DAYS = 300
