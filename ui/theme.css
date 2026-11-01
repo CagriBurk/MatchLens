@@ -22,7 +22,7 @@
 
 .stApp { background: var(--ml-bg); font-family: var(--ml-body); }
 .stApp p, .stApp label, .stApp span, .stApp div { font-family: inherit; }
-.block-container { max-width: 1360px; padding-top: 2.2rem; padding-bottom: 4rem; }
+.block-container { max-width: 1360px; padding-top: 5.5rem; padding-bottom: 4rem; }
 [data-testid="stHeader"] { background: var(--ml-bg); border-bottom: 1px solid var(--ml-line-soft); }
 
 .ml { color: var(--ml-text); font-family: var(--ml-body); font-size: 15px; }
@@ -136,3 +136,6 @@
   .ml-h1 { font-size: 44px; }
   .ml-teams { font-size: 44px; }
 }
+
+.ml-coupon { min-width: 1120px; }
+.ml-coupon .ml-head, .ml-coupon .ml-row { grid-template-columns: 52px 60px minmax(220px, 1.4fr) minmax(170px, 1fr) 64px 60px 60px 72px 64px 64px; }

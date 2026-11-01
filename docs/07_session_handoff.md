@@ -50,4 +50,4 @@ powershell -File scripts\run_ui.ps1                         # arayüz: http://lo
 1. İleriye dönük kaydı izlemek (her sabah update raporu).
 2. Modeli güçlendirmek (Çağrı'nın planı: ikizlerden sağlam veri gelince): ligler arası Elo, Understat xG (Top 5), yorgunluk/UEFA, kadro. Her ekleme `calibration` ve twins backtest'iyle ölçülür.
 3. İkizlerde aynı lig/ligler arası ağırlık, k ve mesafe ölçüsü denemeleri.
-4. Arayüz: v1 hazır (Bülten / Maç detayı / Oran İkizleri, `scripts/run_ui.ps1`). Sıradaki: Karne ekranı (prediction_log), korner/kart motorları (v2).
+4. Arayüz: v1 hazır (Bülten / Maç detayı / Oran İkizleri / Kuponlar, `scripts/run_ui.ps1`). Kuponlar Nesine oranlarıyla sabah update'te üretilir. Sıradaki: Karne ekranı (prediction_log), korner/kart motorları (v2).

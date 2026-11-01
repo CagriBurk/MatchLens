@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.stats import poisson
 
+from matchlens import selections
+
 MAX_GOALS = 10
 MAX_HALF_GOALS = 8
 TOTAL_LINES = (1.5, 2.5, 3.5, 4.5)
@@ -114,6 +116,7 @@ def market_probs(lam_home, lam_away, rho, shares, state_factors=None):
         probs[f"over_{line}"] = over_prob(totals, line)
         probs[f"under_{line}"] = 1 - probs[f"over_{line}"]
     probs.update(ht_ft_probs(first, seconds))
+    probs.update(selections.matrix_probs(matrix))
     return probs, matrix
 
 

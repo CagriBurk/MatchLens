@@ -117,7 +117,12 @@
 - Not: arayüz metinleri Türkçe (kullanıcıya dönük kopya); kod içi log/print İngilizce kuralı aynen geçerli.
 - [x] **Piyasa kapsamı (2026-11-01):** ESPN summary'lerinde DraftKings oranı var (1X2 + standart Üst/Alt 2.5, açılış/kapanış; 2025 sonundan beri, 2026'da 12 ligin hepsinde %91-100). Kalite: 1.901 ortak maçta 1X2 log-loss DK kapanış 0.9955 / Bet365 0.9965, marj %6.1 / %6.6; sızıntı yok (hiçbir maçta p>0.95). Karar (Çağrı): piyasa market bazında önce Bet365, yoksa DraftKings; hiçbir kaynakta 2.5 çizgisi yoksa Asya çizgisi `market_lambda` ile Üst 2.5'e çevrilir (`~`). `prediction_log.market_src` (b365 / dk / b365~ / dk~). Sonuç: önümüzdeki 62 maçta piyasa+ikiz 27 → 60, Üst 2.5 piyasası 5 → 60.
 - [ ] DraftKings geçmişini (~3.7k maç) `twins_pool`'a ve kalibrasyona eklemek (isteğe bağlı).
-- [ ] Sonraki: Karne ekranı (prediction_log isabeti, kaynak bazında), tasarım revizyonu (işler bitince).
+- [x] **Kuponlar (2026-11-01, Çağrı'nın isteği):** 4. sekme. Her sabah update'te o günün kuponları üretilip `coupon_log`'a yazılır, maçlar bitince sonuçlandırılır (`--rebuild-coupons` ile yeniden üretim).
+  - Oranlar **Nesine/İddaa** (`data_pipeline/nesine.py`, `getprebultenfull`, ~1.8 MB/gün; ham `data/raw/nesine/`, eşleşmiş oranlar `nesine_odds`). ESPN eşleşmesi: başlama ±20 dk + takım ismi benzerliği (ilk denemede pencere içindeki 53/53 maç). Market kodları (MTID) editör seçimlerinden ve model korelasyonuyla doğrulandı (MS&KG sırası: 1&Var, 1&Yok, X&Var, X&Yok, 2&Var, 2&Yok). İki yarı KG ve 0-15 dk kodu bulunamadı.
+  - Kombolar (`matchlens/selections.py`): MS&KG, MS&1.5/2.5 Alt-Üst, KG&2.5 Alt-Üst; model skor matrisinden, ikizler 200 maçtan aynı tanımla.
+  - Kural: güvenli olasılık = min(Model, İkiz); seçim şartı güvenli olasılık ≥ İddaa marjsız yüzdesi (esnek); DEĞER etiketi güvenli × oran ≥ 1. Kupon başına bir maç, MBS kuralı. Mavi 1.35-1.65 / hedef tutma ≥%20, Sarı 1.70-2.40 / ≥%6, Kırmızı 2.50-4.50 / ≥%2 (2-4 seçim, MS kombo öncelikli), Sürpriz: 6+, İY/MS 1/2-2/1, iki yarı 1.5 Üst'ten en iyi 10 aday.
+  - İlk gözlem: İddaa marjı Üst/KG Var tarafında yoğun; seçimler Alt/KG Yok ağırlıklı çıkıyor, DEĞER'li seçim nadir.
+- [ ] Sonraki: Karne ekranı (prediction_log + coupon_log isabeti, kaynak bazında), tasarım revizyonu (işler bitince).
 
 ## 📌 Aşama 5: Streamlit "5 Ekranlı Pro Karar Destek Platformu" Arayüzü
 - [ ] **Ekran 1 — Günün AI Fırsatları (Vitrin):** `Oran >= 1.50` ve yüksek Edge filtreli, 3/3 Üçlü Onay rozetli öne çıkan maçlar.
@@ -125,6 +130,12 @@
 - [ ] **Ekran 3 — Bet365 Oran İkizleri Tarayıcısı:** Benzer oranlı geçmiş maçlarda ne çıktığını, en sık görülen skorları ve oran düşüşlerini (*Smart Money*) gösteren ekran.
 - [ ] **Ekran 4 — Sürpriz & Özel Oran Avcısı:** `6+ Gol`, `Her İki Yarı 1.5 Üst`, `Her İki Yarı KG Var` ve `0-15 Dk Gol` fırsatlarının listelendiği yüksek oran radarı.
 - [ ] **Ekran 5 — Backtest & Kasa Simülatörü:** Sistemin geçmiş maçlardaki isabet oranını ve ROI başarısını kanıtlayan simülasyon ekranı.
+
+## 📌 Aşama 7 (v3, son faz): Canlı Bildirim
+- Fikir (Çağrı): maç sırasında (örn. 15. dk, favori ev sahibi baskıda, takım 15-30 arasında çok gol atıyor) "oynanabilir" bildirimi.
+- Parçalar: takım bazlı 15 dk gol dağılımı (ESPN gol dakikaları, lig ortalamasına çekilmiş), canlı skor/dakika ve şut (ESPN, 30-60 sn gecikme; tehlikeli atak verisi yok), kalan süre + skor durumlu canlı Poisson, Nesine canlı oranı (incelenmedi), Telegram/Windows bildirimi.
+- Riskler: canlı oran baskıyı hızla fiyatlar; maç boyu sürekli veri çekme (ölçülü internet); kanıt için uzun kayıt gerekir.
+- Önce "bildirim + kayıt" modu, parasız test; ön maç kuponları ve Karne'den sonra.
 
 ## 📌 Aşama 6: Otomasyon ve Ürünleşme
 - [ ] Verilerin her gün otomatik çekilmesi (cron job).

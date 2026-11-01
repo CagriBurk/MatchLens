@@ -7,6 +7,7 @@ from scipy.spatial import cKDTree
 
 from data_pipeline.db import connect
 from data_pipeline.espn.matches import load_matches
+from matchlens import selections
 from matchlens.market_lambda import fair_three_way, fair_two_way
 
 K = 200
@@ -19,9 +20,12 @@ ESPN_ONLY_KAGGLE = {"den.1", "nor.1", "usa.1"}
 MARKETS = [
     "home", "draw", "away", "over_1.5", "over_2.5", "over_3.5", "btts_yes", "goals_6plus",
     "ht_over_0.5", "ht_over_1.5", "both_halves_over_1.5", "both_halves_btts",
-    "htft_1/1", "htft_X/X", "htft_2/2", "htft_1/2", "htft_2/1", "early_goal_0_15",
+    "htft_1/1", "htft_X/X", "htft_2/2", "htft_1/2", "htft_2/1",
+    "dc_1x", "dc_12", "dc_x2", "under_1.5", "under_2.5", "under_3.5", "btts_no",
+    "ht_home", "ht_draw", "ht_away", "htft_1/X", "htft_X/1", "htft_X/2", "htft_2/X",
+    *selections.COMBOS, "early_goal_0_15",
 ]
-HALF_MARKETS = {"ht_over_0.5", "ht_over_1.5", "both_halves_over_1.5", "both_halves_btts", "htft_1/1", "htft_X/X", "htft_2/2", "htft_1/2", "htft_2/1"}
+HALF_MARKETS = {"ht_over_0.5", "ht_over_1.5", "both_halves_over_1.5", "both_halves_btts", "ht_home", "ht_draw", "ht_away", *selections.HTFT}
 ODDS_COLUMNS = ["o_home", "o_draw", "o_away", "o_over25", "o_under25"]
 POOL_COLUMNS = ["source", "league", "date", "event_id", "p_home", "p_draw", "p_away", "p_over25",
                 "home_goals", "away_goals", "ht_home", "ht_away", "early_goal", "home_team", "away_team"] + ODDS_COLUMNS
@@ -152,6 +156,8 @@ def outcome_matrix(pool):
         "htft_2/2": (ht_sign == -1) & (ft_sign == -1), "htft_1/2": (ht_sign == 1) & (ft_sign == -1),
         "htft_2/1": (ht_sign == -1) & (ft_sign == 1),
     }
+    values.update(selections.full_time(hg, ag))
+    values.update(selections.half_time(hg, ag, hh, ha))
     matrix = np.column_stack([values[m].astype(float) for m in MARKETS[:-1]] + [pool["early_goal"].to_numpy(float)])
     for i, market in enumerate(MARKETS):
         if market in HALF_MARKETS:
@@ -256,11 +262,12 @@ def walk_forward(finder, start=TEST_START, k=K, chunk=5000):
             found, _ = finder.neighbours(pool.loc[rows, columns].to_numpy(), finder.dates[rows], k=k, use_over=use_over)
             h, c = finder.frequencies(found)
             hits[rows], counts[rows] = h, c
-    result = pool.loc[targets].copy()
+    columns = {}
     for i, market in enumerate(MARKETS):
-        result[f"twin_{market}"] = hits[targets, i]
-        result[f"twin_{market}_n"] = counts[targets, i]
-    return result
+        columns[f"twin_{market}"] = hits[targets, i]
+        columns[f"twin_{market}_n"] = counts[targets, i]
+    result = pool.loc[targets].reset_index(drop=True)
+    return pd.concat([result, pd.DataFrame(columns)], axis=1).set_axis(targets, axis=0)
 
 
 def smoothed(result, market, classes=2):
