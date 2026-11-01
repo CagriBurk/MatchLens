@@ -49,6 +49,9 @@ powershell -File scripts\run_ui.ps1
 - Deney betikleri/varyant tahminleri oturum scratchpad'indeydi (kalıcı değil); tekrar için `backtest --ridge X --ridge-style Y` + `health`.
 
 ## 7. Sıradaki İş
+**Veri toplama modu (Çağrı, 2026-11-01 gece):** İkiz laboratuvarı (roadmap) ve oran hareketi araştırması sonucunda ne model ne ikizler İddaa marjını (Kral Oran'la bile %12-16) aşacak avantaj göstermedi; proje bir süre geliştirilmeyecek, sadece veri toplanacak. Çağrı her sabah kök dizindeki `MatchLens.bat` ile açıyor (o gün update yoksa önce çalıştırır, sonra arayüzü başlatıp tarayıcıyı açar). Yeni ince ayar/özellik önerme. ~2026-11-29'da tek değerlendirme: `selection_log`'da "İddaa > Bet365" (Kral Oran = Nesine × 1.04, iddaa.com `sportsbookv2.iddaa.com/sportsbook/events?st=1&type=0&version=0`, `odd` kral / `wodd` normal) seçimleri yüzlerce sonuçta kâra geçiyor mu; geçmiyorsa proje eğlence/bilgi aracı olarak kesinleşir. Bekleyen küçük işler (Çağrı onaylarsa): ikiz k=1000 + piyasaya çekme, Karne'ye Kral Oran sütunu ve "İddaa > Bet365" kuralı, kuponlara beklenen kayıp.
+
+
 **Model ayarı donduruldu (Çağrı, 2026-11-01):** split30 (güç 3 / stil 30) üretimde, ölçüt kalibrasyon. Akşam denenen sıkı log-loss kapısı, mevsimsellik ve gol seviyesi takipçisi binde bir kazanç verdi, kanıtlanamadı, geri alındı (git: 2361300, ebfacae). 2026 sonbahar gol artışı öngörülemez şok; Karne'den izlenecek.
 
 Sıradaki (nitelikli işler):

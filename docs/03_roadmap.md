@@ -161,6 +161,8 @@
 - Çift uyum kombosu (Ü2.5+KG, MS1+KG, MS1+Ü2.5 vb.): 0.69-1.10, çoğu ≈1.0. "Tuzak" tarafı (ikiz ≤ piyasa × 0.9) gerçek ama küçük: 0.95-0.975 (çekilmiş k1000: 0.87) → uzak durma listesi hafif bilgi taşıyor, kazanç yaratmıyor.
 - Sonuç: ikizler piyasanın aynası; oranın içindeki desen zaten oranda. Daha çok komşu + piyasaya çekme ikizi daha dürüst yapıyor ama İddaa marjını aşacak bir avantaj hiçbir yöntemde, hiçbir market grubunda yok.
 
+- **Karar (Çağrı, 2026-11-01 gece):** geliştirme duraklatıldı, veri toplama modu; `MatchLens.bat` ile günlük kullanım. ~2026-11-29'da `selection_log` üzerinden "İddaa > Bet365" (Kral Oran dahil) değerlendirmesi; kâr yoksa proje eğlence/bilgi aracı.
+
 ## 📌 Aşama 7 (v3, son faz): Canlı Bildirim
 - Fikir (Çağrı): maç sırasında (örn. 15. dk, favori ev sahibi baskıda, takım 15-30 arasında çok gol atıyor) "oynanabilir" bildirimi.
 - Parçalar: takım bazlı 15 dk gol dağılımı (ESPN gol dakikaları, lig ortalamasına çekilmiş), canlı skor/dakika ve şut (ESPN, 30-60 sn gecikme; tehlikeli atak verisi yok), kalan süre + skor durumlu canlı Poisson, Nesine canlı oranı (incelenmedi), Telegram/Windows bildirimi.
