@@ -53,6 +53,8 @@ powershell -File scripts\run_ui.ps1
 
 Sıradaki (nitelikli işler):
 1. ~~Kuponları ikiye bölmek~~ yapıldı (2026-11-01 akşam, roadmap 5a). İlk yeni kuponlar 02.11 07:30 update ile; logun eksiksiz bittiğini kontrol et (01.11 11:57 çalışmasının logu "logged" satırında kesik, kuponlar 14:21'de elle üretilmişti).
+- v2 oran hareketi araştırması yapıldı (roadmap "v2"): hareket sabah fiyatına ek bilgi vermiyor, kâr yok; ürüne girmedi.
+- FootyStats üyeliği bitmeden Çağrı'nın elle indirmesi önerildi: eng.1 2023/24-2025/26, esp.1/ita.1/ger.1/fra.1 2023/24-2026/27 maç CSV'leri (+ istenirse 12 lig için 2019/20-2022/23). `data/raw/footystats/`e koyup `python -m data_pipeline.run_pipeline footystats` + `python -m matchlens.twins build` (büyük 4 ligin dosya adları okuyucuya eklendi).
 2. Karne'yi izlemek: ileriye dönük isabet ve kupon tutma oranı birkaç hafta birikince değerlendirilecek.
 3. Son faz (v3): canlı bildirim (roadmap Aşama 7).
 - Not: 01.11 tahminleri/kuponları ridge 5 ile üretildi; 02.11 07:30 update'ten itibaren split30.

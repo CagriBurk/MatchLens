@@ -11,6 +11,7 @@ from data_pipeline.espn.matches import load_matches
 FILE_PATTERN = re.compile(r"(?P<prefix>.+)-matches-(?P<start>\d{4})-to-(?P<end>\d{4})-stats\.csv")
 LEAGUES = {
     "england-premier-league": "eng.1", "england-championship": "eng.2", "spain-segunda-division": "esp.2",
+    "spain-la-liga": "esp.1", "italy-serie-a": "ita.1", "germany-bundesliga": "ger.1", "france-ligue-1": "fra.1",
     "turkey-super-lig": "tur.1", "belgium-pro-league": "bel.1", "denmark-superliga": "den.1",
     "norway-eliteserien": "nor.1", "usa-mls": "usa.1", "sweden-allsvenskan": "swe.1", "japan-j1-league": "jpn.1",
     "japan-j1-100-year-vision-league": "jpn.1.vision", "poland-ekstraklasa": "pol.1",

@@ -143,6 +143,14 @@
 - [ ] **Ekran 4 — Sürpriz & Özel Oran Avcısı:** `6+ Gol`, `Her İki Yarı 1.5 Üst`, `Her İki Yarı KG Var` ve `0-15 Dk Gol` fırsatlarının listelendiği yüksek oran radarı.
 - [ ] **Ekran 5 — Backtest & Kasa Simülatörü:** Sistemin geçmiş maçlardaki isabet oranını ve ROI başarısını kanıtlayan simülasyon ekranı.
 
+## 📌 v2: Oran Hareketleri (Smart Money) Araştırması (2026-11-01)
+- Veri: Kaggle archangel0x01/football-odds-movements-2018-2026 (`data/raw/kaggle/odds_movements/`), 63.6k maç 2018-07..2026-06, Bet365/Pinnacle/SBOBET/Singbet zaman damgalı 1X2, Asya ve Alt/Üst hareketleri. Kullanılan anlar: açılış, başlamadan 6 saat önce (T; sabah update'ine denk), kapanış. Ayar < 2024-07 ≤ test (16.7k maç). Betikler oturum scratchpad'inde (kalıcı değil).
+- 1X2 log-loss (test): Pinnacle açılış 0.9846 → T 0.9754 → kapanış 0.9731; Bet365 0.9849 → 0.9764 → 0.9740. Bilginin çoğu T'ye kadar fiyata girmiş; T'den kapanışa kalan 0.002. Pinnacle ile Bet365 arasındaki fark çok küçük (marj %3.4 / %5.9) → Bet365'i referans almak yerinde.
+- Açılıştan T'ye hareket, T fiyatına ek bilgi vermiyor (lojistik test, log-loss farkı ±0.0001; Alt/Üst 2.5 için de aynı). Momentum yok (T'ye kadarki hareket ile T→kapanış korelasyonu +0.03; Alt/Üst'te hafif geri dönüş −0.1).
+- Sadece uçlarda küçük etki: oranı en çok uzayan %10'luk taraflar T fiyatının dediğinden 1-2 puan az, en çok düşen %10 1-2 puan fazla tutuyor (~2σ). Hiçbir dilimde Pinnacle oranıyla bile kâr yok (en iyi −%0.2); İddaa marjıyla (~%15) hiç yok.
+- Pinnacle(T) adil fiyatı > Bet365(T) oranı kuralı: ROI −%1.4 (se %2.1, 10k bahis); Bet365 kapanışa doğru Pinnacle'a yaklaşıyor (korelasyon +0.15) ama kâr bırakacak kadar değil.
+- Sonuç: "oran düşüyor, akıllı para giriyor" sinyali sabah fiyatına anlamlı bir şey eklemiyor; model/kupon kuralına girmez. Olası küçük kullanım (yapılmadı): seçimin oranı açılıştan beri belirgin uzamışsa uyarı etiketi (ESPN DraftKings açılış/güncel oranı canlı mevcut).
+
 ## 📌 Aşama 7 (v3, son faz): Canlı Bildirim
 - Fikir (Çağrı): maç sırasında (örn. 15. dk, favori ev sahibi baskıda, takım 15-30 arasında çok gol atıyor) "oynanabilir" bildirimi.
 - Parçalar: takım bazlı 15 dk gol dağılımı (ESPN gol dakikaları, lig ortalamasına çekilmiş), canlı skor/dakika ve şut (ESPN, 30-60 sn gecikme; tehlikeli atak verisi yok), kalan süre + skor durumlu canlı Poisson, Nesine canlı oranı (incelenmedi), Telegram/Windows bildirimi.
