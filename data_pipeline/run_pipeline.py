@@ -1,12 +1,14 @@
 import argparse
 
-from data_pipeline import feature_engine, ingest_elo, ingest_understat, merge_features
+from data_pipeline import feature_engine, ingest_elo, ingest_footystats, ingest_kaggle, ingest_understat, merge_features
 
 STEPS = {
     "understat": ingest_understat.run,
     "elo": ingest_elo.run,
     "features": feature_engine.run,
     "merge": merge_features.run,
+    "kaggle": ingest_kaggle.run,
+    "footystats": ingest_footystats.run,
 }
 
 

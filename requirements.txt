@@ -1,5 +1,6 @@
 numpy==2.5.1
 pandas==3.0.3
+scipy==1.18.1
 pyarrow==24.0.0
 requests==2.34.2
 python-dotenv==1.2.2
@@ -7,3 +8,5 @@ soccerdata==1.9.1
 fastapi==0.141.0
 uvicorn==0.52.0
 streamlit==1.60.0
+kaggle==2.2.5
+pytest==9.1.1

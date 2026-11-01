@@ -24,12 +24,41 @@
 - **Veri omurgası ESPN.** Understat yalnızca Top 5 lig için derin katman (xG/PPDA/Deep). Elo'yu kendimiz sonuçlardan hesaplayacağız (repoda daha önce kendi Elo kodu yokmuş, sadece ClubElo çekici vardı; ClubElo şu an çalışmıyor).
 - **Lig listesi (ilk faz, 12 lig):** eng.1, esp.1, ita.1, ger.1, fra.1, tur.1, bel.1, den.1, nor.1, usa.1, eng.2, esp.2. Danimarka 2 ve Norveç 2 ESPN'de yok. Liste `data_pipeline/espn/leagues.py` içinde, genişletmek tek satır (ESPN'de jpn.1, ned.1, por.1, ger.2, ita.2, fra.2, eng.3, sco.1 vb. de var).
 
+## ✅ Alınan Kararlar (2026-11-01)
+- **İş sırası değişti:** Önce ESPN verisiyle gol motoru + backtest + bülten (isim eşleştirmesi gerektirmiyor); Kaggle ingest, isim eşleştirme, kendi Elo'muz, FootyStats xG katmanı ve Understat genişletmesi v1.1'e.
+- **The Odds API şimdilik bırakıldı:** ev Wi-Fi'sinde `the-odds-api.com` ve `api.the-odds-api.com` TLS aşamasında sıfırlanıyor (SNI tabanlı ISS engeli). Güncel Bet365 oranı yalnızca ESPN'den (Top 5 + eng.2 + usa.1); diğer liglerde bülten oran kıyası olmadan sadece model olasılığı gösterir.
+- **Model takım anahtarı ESPN takım ID'si** (isim değişikliklerine dayanıklı). AET/penaltılı maçlar eğitimden çıkarılır (sadece `STATUS_FULL_TIME`).
+- **Dixon-Coles varsayılanları:** xi=0.0019/gün (yarı ömür ~1 yıl), ridge=5, 4 yıllık pencere, yeni takımlar için negatif prior (grid araması 2019-2026 walk-forward, 1X2 log-loss'a göre).
+
+## 📌 Aşama 4a: v1 Gol Motoru (2026-11-01)
+- [x] `matchlens/data.py`: ESPN scoreboard önbelleğinden maçlar + İY golleri + 0-15 dk golleri (`events_consistent` maçlardan).
+- [x] `matchlens/dixon_coles.py`: lig bazlı, zaman ağırlıklı, ridge'li Dixon-Coles (analitik gradyan, L-BFGS-B, fit ~0.04 sn). Yarı payları ve erken gol payı lig bazında.
+- [x] `matchlens/markets.py`: skor matrisi → 1X2, ÇŞ, Alt/Üst 1.5-4.5, KG, İY 1X2, İY/2Y 0.5/1.5 Üst, İY/MS (9), İki Yarı 1.5 Üst, İki Yarı KG, 6+ gol, 0-15 dk gol, en olası skorlar.
+- [x] `matchlens/odds.py`: marj temizleme, adil oran, EV, Asya gol çizgisi (2.25/2.75/3.0) hesaplaşması.
+- [x] `matchlens/backtest.py`: haftalık walk-forward (2019-07+), log-loss (model / taban / Bet365), flat-stake ROI. Tahminler `backtest_predictions` tablosuna.
+- [x] `matchlens/bulletin.py`: `python -m matchlens.bulletin --date YYYY-MM-DD` → fikstür + ESPN Bet365 oranları + model olasılıkları + özel marketler + değer adayları; CSV `data/bulletins/`.
+- [x] Testler: `tests/` (34 test; markets, odds, Dixon-Coles gradyan/sızıntı, backtest).
+- **İlk backtest (31.902 maç, 745 oranlı maç):** 1X2 log-loss model 1.015 / taban 1.072; Bet365 karşısında model 1.004, piyasa 0.981 → **model henüz piyasayı yenmiyor**, ROI -%8..-%13. Over 2.5 kalibrasyonu uçlarda fazla emin (tahmin %30 → gerçek %38, %79 → %71).
+- [ ] Backfill bitince backtest'i tam Bet365 örneklemiyle tekrar koş.
+- [ ] Gol marketleri için kalibrasyon katmanı (gol marketleri daha yüksek küçültmeyi tercih ediyor: ridge≈20).
+- [ ] Model + piyasa harmanı (blend) ve değer eşiğinin backtest ile belirlenmesi.
+
+## 📌 Aşama 4b: Kaggle + FootyStats Ingest ve Otomatik İsim Eşleştirme (2026-11-01)
+- [x] `data_pipeline/linking.py`: dış kaynak maçlarını ESPN'e bağlar. Aday çiftler (lig, ±1 gün, aynı skor) → takım ismi→ESPN ID çoğunluk oyu (en az 3 oy, ikinci adaydan ≥3 kat) → eşlenmiş ID'ler + ±2 gün ile kesin birleştirme; `score_match` bayrağı. Sonuç `team_name_map` tablosu (source = kaggle / footystats).
+- [x] `data_pipeline/ingest_kaggle.py` → `kaggle_matches` (158.560 maç, 23 bölüm, 2000-2026/09) + `kaggle_elo`. ESPN'e bağlanan 37.350 maç; ana liglerde bağlanma %99-100, skor uyumu %99.7-100.
+- [x] `data_pipeline/ingest_footystats.py` → `footystats_matches` (18.346 maç, 18 lig/turnuva). ESPN liglerinde bağlanma %100, eşlenemeyen isim yok.
+- **Bulgu:** Kaggle `OddHome` Bet365 değil (ESPN Bet365 ile birebir eşleşme %10, marj %5.1 vs %5.7) → piyasa ortalaması/başka zaman damgası; piyasa referansı olarak kullanılır.
+- **Bulgu:** Kaggle DEN/NOR/USA satırlarının ~%35'i hatalı (olmayan maçlar, yanlış skorlar). Bu liglerde sadece ESPN'e bağlanan Kaggle satırları kullanılır; ayrıca Alt/Üst oranı yok ve 2024 sonunda bitiyor.
+- **FootyStats rolü:** (1) KG ve Üst 1.5/3.5/4.5 oranlarının tek kaynağı → bu marketlerin backtest/kalibrasyonu; (2) Top 5 dışı liglerde xG (2023/24+) → xG katmanı denemesi; (3) den/nor/usa 2025-2026 oranları (Kaggle'da yok). Üyelik bitince güncel sezon xG'si güncellenemez → canlı xG katmanı üyelik süresine bağlı.
+- [ ] FootyStats oranlarının kaynağını ESPN Bet365 ile karşılaştır (backfill sonrası).
+
 ## 📌 Aşama 2.5: ESPN Veri Omurgası
 - [x] `data_pipeline/ingest_espn.py` + `data_pipeline/espn/` (client / parse / leagues). Ham JSON `data/raw/espn/` altında gzip önbellek; biten maçlar bir daha çekilmez.
 - [x] Scoreboard (lig×yıl tek istek): 43.916 maç, 2016-2026, skor + gol/kart dakikaları (`espn_matches`, `espn_match_events`). Own goal yararlanan takıma yazılıyor; skor/olay tutarlılığı %98.1 (`events_consistent` bayrağı; tutarsızlar ağırlıkla bel/den 2016-17, tur 2018/2022).
 - [x] Kapsam ölçümü (lig-sezon başı 15 maç örneklem): İstatistik (korner/şut/faul/kart/topa sahip olma) Top 5 + eng.2 + usa.1'de 2016'dan beri %100; esp.2 2021+, tur.1 2016-18 ve 2024+, bel.1 2024+, den.1 2024+, nor.1 2024+. Bet365 maç öncesi oran (1X2 + gol çizgisi): Top 5 + eng.2 2018+ büyük ölçüde var; bel/tur kısmi; den/nor/esp.2 (2022+) ve usa.1 neredeyse yok.
-- [ ] Tam summary backfill (~42k maç, ~1.2-1.3 GB) — kotalı internet nedeniyle durduruldu (~2.800 summary önbellekte). Yarın sınırsız Wi-Fi'de devam (bkz. `docs/07_session_handoff.md`).
-- [ ] Kaggle: `adamgbor/club-football-match-data-2000-2025` (~16 MB, football-data aynası + Bet365 + istatistik) ve `archangel0x01/football-odds-movements-2018-2026` (~542 MB, açılış-kapanış ve oran hareketleri) indirilecek.
+- [ ] Tam summary backfill (~43k maç, ~1.2-1.3 GB) — 2026-11-01'de sınırsız Wi-Fi'de yeniden başlatıldı (~6 istek/sn). Bitince `ingest_espn build` + `coverage`.
+- [x] Kaggle `adamgbor/club-football-match-data-2000-2025` indirildi (`data/raw/kaggle/club_football/`, 2026-11-01).
+- [ ] Kaggle `archangel0x01/football-odds-movements-2018-2026` (~542 MB, açılış-kapanış ve oran hareketleri) — v2 (Smart Money) için ertelendi.
 - [ ] Günlük güncelleme komutu (bu yılın scoreboard'ları + önümüzdeki 7 günün summary'leri).
 
 ## 🔶 Açık Sorular
