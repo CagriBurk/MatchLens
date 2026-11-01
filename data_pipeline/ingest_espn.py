@@ -70,7 +70,29 @@ def fetch_summaries(targets, workers=4):
     print(f"summaries finished: {done} ok, {failed} failed")
 
 
-def build_tables(leagues, years):
+def table_columns(conn, name):
+    return [row[1] for row in conn.execute(f'PRAGMA table_info("{name}")')]
+
+
+def write_tables(tables, event_ids, incremental):
+    with connect() as conn:
+        conn.execute("CREATE TEMP TABLE IF NOT EXISTS build_ids (event_id TEXT PRIMARY KEY)")
+        conn.execute("DELETE FROM build_ids")
+        conn.executemany("INSERT INTO build_ids VALUES (?)", [(i,) for i in event_ids])
+        for name, df in tables.items():
+            columns = table_columns(conn, name)
+            if not incremental or not columns:
+                df.to_sql(name, conn, if_exists="replace", index=False)
+            else:
+                conn.execute(f'DELETE FROM "{name}" WHERE event_id IN (SELECT event_id FROM build_ids)')
+                for column in df.columns:
+                    if column not in columns:
+                        conn.execute(f'ALTER TABLE "{name}" ADD COLUMN "{column}"')
+                df.to_sql(name, conn, if_exists="append", index=False)
+            print(f"{name}: {len(df)} rows written")
+
+
+def build_tables(leagues, years, incremental=False):
     matches, events, stats, odds = [], [], [], []
     seen = set()
     for league, event in cached_events(leagues, years):
@@ -98,10 +120,7 @@ def build_tables(leagues, years):
         "espn_team_stats": pd.DataFrame(stats),
         "espn_odds": pd.DataFrame(odds),
     }
-    with connect() as conn:
-        for name, df in tables.items():
-            df.to_sql(name, conn, if_exists="replace", index=False)
-            print(f"{name}: {len(df)} rows")
+    write_tables(tables, seen, incremental)
 
 
 def coverage_report():
@@ -141,6 +160,7 @@ def main():
     parser.add_argument("--to-year", type=int, default=current_year())
     parser.add_argument("--sample", type=int, default=None)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--incremental", action="store_true")
     args = parser.parse_args()
     years = list(range(args.from_year, args.to_year + 1))
 
@@ -151,7 +171,7 @@ def main():
         print(f"summary targets: {len(targets)}")
         fetch_summaries(targets, workers=args.workers)
     if args.action in ("build", "all"):
-        build_tables(args.leagues, years)
+        build_tables(args.leagues, years, incremental=args.incremental)
     if args.action in ("coverage", "all"):
         coverage_report()
 

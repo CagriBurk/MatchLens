@@ -21,13 +21,23 @@ ODDS_MARKETS = [
 ]
 
 
-def fixtures_for(date, leagues, refresh):
+def refresh_years():
+    week_ago = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=7)
+    return sorted({week_ago.year, current_year()})
+
+
+def refresh_scoreboards(leagues):
+    for league in leagues:
+        for year in refresh_years():
+            client.fetch_scoreboard(league, year, refresh=True)
+
+
+def fixtures_for(dates, leagues, refresh):
     if refresh:
-        for league in leagues:
-            client.fetch_scoreboard(league, current_year(), refresh=True)
+        refresh_scoreboards(leagues)
     matches = load_matches(leagues, from_year=current_year() - 4)
     local_date = matches["kickoff"].dt.tz_convert(LOCAL_TZ).dt.date
-    day = matches[(local_date == date) & matches["state"].eq("pre")]
+    day = matches[local_date.isin(set(dates)) & matches["state"].eq("pre")]
     return matches, day.sort_values("kickoff")
 
 
@@ -46,7 +56,7 @@ def evaluate_match(match, model, odds_row):
     probs, matrix = markets.market_probs(lam_h, lam_a, model.rho, model.shares)
     totals = markets.total_distribution(matrix)
     kickoff = match.kickoff.tz_convert(LOCAL_TZ).strftime("%H:%M")
-    base = {"event_id": match.event_id, "league": match.league, "kickoff": kickoff,
+    base = {"event_id": match.event_id, "league": match.league, "kickoff": kickoff, "kickoff_utc": match.kickoff_utc,
             "home_team": match.home_team, "away_team": match.away_team, "lam_home": lam_h, "lam_away": lam_a}
     record = {**base, **probs}
     record["top_scores"] = " ".join(f"{h}-{a}" for h, a, _ in markets.top_scores(matrix, 3))
@@ -62,7 +72,7 @@ def evaluate_match(match, model, odds_row):
             market_p = None
             if key in ("home", "draw", "away") and market_probs[0] is not None:
                 market_p = float(market_probs[("home", "draw", "away").index(key)])
-            candidates.append({**base, "market": label, "model_p": probs[key], "market_p": market_p,
+            candidates.append({**base, "market": label, "key": key, "line": None, "model_p": probs[key], "market_p": market_p,
                                "fair_odds": odds.fair_odds(probs[key]), "b365": price,
                                "ev": odds.expected_value(probs[key], price)})
         line = odds_row.get("b365_goal_line")
@@ -71,13 +81,14 @@ def evaluate_match(match, model, odds_row):
             if line is None or not price:
                 continue
             ev = odds.asian_total_ev(totals, line, price, side)
-            candidates.append({**base, "market": f"{side.title()} {line:g}", "model_p": None, "market_p": None,
+            candidates.append({**base, "market": f"{side.title()} {line:g}", "key": f"asian_{side}", "line": line,
+                               "model_p": None, "market_p": None,
                                "fair_odds": None, "b365": price, "ev": ev})
     return record, candidates
 
 
-def build(date, leagues, refresh=True):
-    matches, day = fixtures_for(date, leagues, refresh)
+def build(dates, leagues, refresh=True):
+    matches, day = fixtures_for(dates, leagues, refresh)
     if day.empty:
         return pd.DataFrame(), pd.DataFrame()
     odds_rows = fetch_odds(day)
@@ -151,7 +162,7 @@ def main():
     parser.add_argument("--min-ev", type=float, default=MIN_EV)
     parser.add_argument("--no-refresh", action="store_true")
     args = parser.parse_args()
-    records, candidates = build(args.date, args.leagues, refresh=not args.no_refresh)
+    records, candidates = build([args.date], args.leagues, refresh=not args.no_refresh)
     if records.empty:
         print(f"No scheduled fixtures on {args.date}")
         return

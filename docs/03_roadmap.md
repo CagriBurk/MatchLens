@@ -59,7 +59,9 @@
 - [ ] Tam summary backfill (~43k maç, ~1.2-1.3 GB) — 2026-11-01'de sınırsız Wi-Fi'de yeniden başlatıldı (~6 istek/sn). Bitince `ingest_espn build` + `coverage`.
 - [x] Kaggle `adamgbor/club-football-match-data-2000-2025` indirildi (`data/raw/kaggle/club_football/`, 2026-11-01).
 - [ ] Kaggle `archangel0x01/football-odds-movements-2018-2026` (~542 MB, açılış-kapanış ve oran hareketleri) — v2 (Smart Money) için ertelendi.
-- [ ] Günlük güncelleme komutu (bu yılın scoreboard'ları + önümüzdeki 7 günün summary'leri).
+- [x] Günlük güncelleme komutu `python -m matchlens.update` (2026-11-01): bu yılın (ve 7 gün önceki yılın) scoreboard'ları → yeni biten + önümüzdeki 7 günün summary'leri → ESPN tablolarının artımlı güncellenmesi (`build --incremental`, sadece ilgili yılların event_id'leri silinip yeniden yazılır) → bekleyen tahminlerin sonuçlandırılması → önümüzdeki 3 günün tahminlerinin `prediction_log`'a yazılması → kümülatif isabet (Brier/log-loss) ve EV>%3 bahis ROI raporu.
+- [x] `prediction_log`: (event_id, market) başına tek satır; maç başlayana kadar her güncellemede son tahmin + o anki Bet365 oranı ile üzerine yazılır, başladıktan sonra donar. 16 market + Asya gol çizgisi. Uzatma/penaltılı biten maçlar void.
+- [x] Günlük çalıştırma: Windows Görev Zamanlayıcı "MatchLens Daily Update" her gün 07:30 (`scripts/register_daily_task.ps1`) → `wsl.exe` ile `scripts/daily_update.sh` (flock kilidi, log `data/logs/update.log`). Bilgisayar o saatte kapalıysa açılınca ilk fırsatta çalışır.
 
 ## 🔶 Açık Sorular
 - [ ] Tarihsel Bet365 oranı olmayan lig-sezonlarda backtest/oran ikizleri için ek kaynak (Kaggle'daki football-data aynası tek seferlik indirilebilir).
