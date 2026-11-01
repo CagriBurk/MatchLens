@@ -8,8 +8,9 @@ MIN_EV = 0.03
 LOG_MARKETS = [
     "home", "draw", "away", "dc_1x", "dc_12", "dc_x2", "over_1.5", "over_2.5", "over_3.5", "btts_yes",
     "ht_over_0.5", "ht_over_1.5", "both_halves_over_1.5", "both_halves_btts", "goals_6plus", "early_goal_0_15",
+    "htft_1/2", "htft_2/1",
 ]
-HALF_MARKETS = {"ht_over_0.5", "ht_over_1.5", "both_halves_over_1.5", "both_halves_btts", "early_goal_0_15"}
+HALF_MARKETS = {"ht_over_0.5", "ht_over_1.5", "both_halves_over_1.5", "both_halves_btts", "early_goal_0_15", "htft_1/2", "htft_2/1"}
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS prediction_log (
     event_id TEXT NOT NULL, market TEXT NOT NULL, league TEXT, kickoff_utc TEXT,
@@ -87,6 +88,7 @@ def market_outcome(market, match):
         "both_halves_over_1.5": ht_h + ht_a >= 2 and sh_h + sh_a >= 2,
         "both_halves_btts": ht_h > 0 and ht_a > 0 and sh_h > 0 and sh_a > 0,
         "goals_6plus": total >= 6, "early_goal_0_15": match["early_goals"] > 0,
+        "htft_1/2": ht_h > ht_a and hg < ag, "htft_2/1": ht_h < ht_a and hg > ag,
     }
     if market in outcomes:
         return float(outcomes[market])

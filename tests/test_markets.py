@@ -44,7 +44,7 @@ def test_market_probs_consistency():
 
 
 def test_htft_marginals_match_half_results():
-    probs, _ = markets.market_probs(1.5, 1.2, 0.0, SHARES)
+    probs, _ = markets.market_probs(1.5, 1.2, 0.0, SHARES, markets.NO_STATE_EFFECT)
     ht_home = sum(v for k, v in probs.items() if k.startswith("htft_1/"))
     assert ht_home == pytest.approx(probs["ht_home"], abs=1e-6)
     ft_draw = sum(v for k, v in probs.items() if k.startswith("htft_") and k.endswith("/X"))
@@ -60,3 +60,26 @@ def test_top_scores_ordered():
     matrix = markets.score_matrix(1.5, 1.0, -0.05)
     top = markets.top_scores(matrix, 3)
     assert top[0][2] >= top[1][2] >= top[2][2]
+
+
+def test_core_probs_match_scalar_version():
+    lam_h, lam_a = np.array([1.6, 0.7]), np.array([1.1, 2.0])
+    vector = markets.core_probs(lam_h, lam_a, -0.06)
+    for i in range(2):
+        scalar, _ = markets.market_probs(lam_h[i], lam_a[i], -0.06, SHARES)
+        for key in ("home", "draw", "away", "btts_yes", "over_1.5", "over_2.5", "over_3.5"):
+            assert vector[key][i] == pytest.approx(scalar[key], abs=1e-9)
+
+
+def test_state_effect_raises_reversals_and_keeps_htft_normalised():
+    plain, _ = markets.market_probs(1.5, 1.2, -0.05, SHARES, markets.NO_STATE_EFFECT)
+    state, _ = markets.market_probs(1.5, 1.2, -0.05, SHARES)
+    assert state["htft_1/2"] > plain["htft_1/2"]
+    assert state["htft_2/1"] > plain["htft_2/1"]
+    assert sum(v for k, v in state.items() if k.startswith("htft_")) == pytest.approx(1.0, abs=1e-6)
+    assert state["ht_home"] == pytest.approx(plain["ht_home"])
+
+
+def test_both_halves_markets_without_state_effect_are_products():
+    probs, _ = markets.market_probs(1.5, 1.2, 0.0, SHARES, markets.NO_STATE_EFFECT)
+    assert probs["both_halves_over_1.5"] == pytest.approx(probs["ht_over_1.5"] * probs["2h_over_1.5"], rel=1e-6)

@@ -63,6 +63,18 @@ def test_settle_outcomes_and_profit():
     assert log.loc["btts_yes", "outcome"] == 1.0
     assert log.loc["both_halves_btts", "outcome"] == 0.0
     assert log.loc["early_goal_0_15", "outcome"] == 1.0
+    assert log.loc["htft_1/2", "outcome"] == 0.0
+    assert log.loc["htft_2/1", "outcome"] == 0.0
+    assert log.loc["asian_over", "profit"] == pytest.approx(0.45)
+
+
+def test_reversal_outcome():
+    records, candidates = fixture_frames()
+    tracking.log_predictions(records, candidates, now=NOW)
+    tracking.settle(finished_match(home_goals=1, away_goals=2, ht_home=1, ht_away=0), now=NOW + pd.Timedelta(days=1))
+    log = read_log()
+    assert log.loc["htft_1/2", "outcome"] == 1.0
+    assert log.loc["away", "outcome"] == 1.0
     assert log.loc["asian_over", "profit"] == pytest.approx(0.45)
 
 

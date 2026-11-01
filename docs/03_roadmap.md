@@ -43,6 +43,15 @@
 - [ ] Gol marketleri için kalibrasyon katmanı (gol marketleri daha yüksek küçültmeyi tercih ediyor: ridge≈20).
 - [ ] Model + piyasa harmanı (blend) ve değer eşiğinin backtest ile belirlenmesi.
 
+## 📌 Aşama 4c: Kalibrasyon ve Model + Piyasa Harmanı (2026-11-01)
+- [x] `matchlens/market_lambda.py`: piyasa 1X2 (+ varsa Üst/Alt 2.5) adil olasılıklarından ima edilen (λ_ev, λ_dep); 0.01 adımlı ızgara + KD-ağacı, 30k maç ~1 sn.
+- [x] `matchlens/calibration.py`: backtest tahminleri + Bet365 (ESPN) / Kaggle ort.-max / FootyStats oranları; `log λ = w·model + (1−w)·piyasa` harmanı; ayar (<2023-07) / test (≥2023-07) log-loss, lig bazında en iyi w, ROI.
+- **Sonuç (30.061 maç, test 13.988):** Tüm marketlerde en iyi w = 0 (ayar dönemi). Test 1X2 log-loss: piyasa 0.9895, saf model 1.0106. Saf model ile bahis ROI -%6..-%17. **Saf Dixon-Coles piyasaya bilgi eklemiyor.** Lig bazında küçük katkı sadece az likit liglerin gol marketlerinde (usa/nor/den/bel Üst 2.5 ve KG: w 0.1-0.4).
+- **Özel marketler piyasa λ'sı ile iyi kalibre:** İki Yarı 1.5 Üst tahmin %16.8 / gerçek %17.2, İY 0.5 Üst %71.0 / %71.8, 0-15 dk gol %30.3 / %31.1, 6+ gol %7.2 / %6.7; hepsinde piyasa λ'sı modelden iyi. Piyasa λ'sından türetilen KG (0.6816) FootyStats KG oranının kendisine (0.6795) yakın → yarı bölme yöntemi sağlam.
+
+- [x] **Skor durumu etkisi (İY/MS):** bağımsız yarı varsayımı geri dönüşleri az tahmin ediyordu (1/2 %1.92 vs gerçek %2.40, 2/1 %2.37 vs %3.01). İkinci yarı λ'sı devre skoruna göre çarpılıyor: önde 0.943, geride 1.088, beraberlik 0.960 (30k maçtan oran tahmini; ayar/test dönemlerinde tutarlı). Sonrası: 1/2 %2.31, 2/1 %2.79, 1/1 %27.20 vs %27.13; tüm İY/MS hücrelerinde log-loss iyileşti. (`markets.STATE_FACTORS`)
+- [x] **A: Piyasa çapalı bülten.** Bet365 oranı olan maçlarda λ = piyasa λ'sı (1X2 + Asya gol çizgisi; `market_lambda` artık 2.25/2.75/3.0 gibi çizgileri de çözüyor); gol toplamında lig bazlı model ağırlığı (usa/nor/den 0.2, bel 0.1, diğerleri 0), 1X2 tarafı tamamen piyasa (`matchlens/blend.py`). Oranı olmayan maçlarda saf model (`src=model`). Sürpriz tablosu: İki Yarı KG, İki Yarı 1.5 Üst, 6+, 0-15 dk, İY/MS 1/2 ve 2/1 — olasılık + adil oran. Saf model kenarları sadece `--show-edges` ile "deneysel" etiketiyle. `prediction_log`'a İY/MS 1/2 ve 2/1 eklendi.
+
 ## 📌 Aşama 4b: Kaggle + FootyStats Ingest ve Otomatik İsim Eşleştirme (2026-11-01)
 - [x] `data_pipeline/linking.py`: dış kaynak maçlarını ESPN'e bağlar. Aday çiftler (lig, ±1 gün, aynı skor) → takım ismi→ESPN ID çoğunluk oyu (en az 3 oy, ikinci adaydan ≥3 kat) → eşlenmiş ID'ler + ±2 gün ile kesin birleştirme; `score_match` bayrağı. Sonuç `team_name_map` tablosu (source = kaggle / footystats).
 - [x] `data_pipeline/ingest_kaggle.py` → `kaggle_matches` (158.560 maç, 23 bölüm, 2000-2026/09) + `kaggle_elo`. ESPN'e bağlanan 37.350 maç; ana liglerde bağlanma %99-100, skor uyumu %99.7-100.
