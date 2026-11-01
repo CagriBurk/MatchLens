@@ -152,6 +152,15 @@
 - Pinnacle(T) adil fiyatı > Bet365(T) oranı kuralı: ROI −%1.4 (se %2.1, 10k bahis); Bet365 kapanışa doğru Pinnacle'a yaklaşıyor (korelasyon +0.15) ama kâr bırakacak kadar değil.
 - Sonuç: "oran düşüyor, akıllı para giriyor" sinyali sabah fiyatına anlamlı bir şey eklemiyor; model/kupon kuralına girmez. Olası küçük kullanım (yapılmadı): seçimin oranı açılıştan beri belirgin uzamışsa uyarı etiketi (ESPN DraftKings açılış/güncel oranı canlı mevcut).
 
+## 📌 İkiz Laboratuvarı (2026-11-01 gece, Çağrı: "ikizi ana sistem yap, önyargısız kıyasla")
+- Betikler `scripts/research/twin_lab.py` (komşular) + `twin_eval.py` (değerlendirme), çıktı `data/reports/twin_lab_20261101.txt`. Hedef: havuzdaki 2019-07+ 48.045 maç (Ü/A oranlı), komşular sadece hedef ayından önceki maçlar; ayar < 2022-07 ≤ sınav (32.150 maç); 37 market (1X2, ÇŞ, Ü/A 1.5-3.5, KG, 6+, 11 kombo, İY, iki yarı, İY/MS).
+- Yöntemler: küresel en yakın k = 50/100/200/500/1000/2000; aynı lig son 3 yıl k = 50/200; ağırlıklı (uzaklık çekirdeği × 3 yıl yarı ömür × aynı lig 2x); hepsi ham ve "piyasaya doğru çekilmiş" (p = (n·ikiz + a·piyasa)/(n + a), a markete göre ayarda seçildi). Kıyas: Bet365/ortalama oranın kendisi (1X2, Ü2.5) ve ondan türetilen fiyat (diğerleri).
+- Türetilmiş piyasa fiyatı tüm 37 markette ±1 puan kalibre (kupon `~` referansı güvenilir).
+- Ham ikizler piyasadan kötü: log-loss farkı ×1000: k50 +13.3, aynı lig k50 +13.2, k200 (üretim) +2.4, k1000 +0.5. Az komşu = gürültü; lig/tarih yakınlığı yardım etmiyor. Çekilmiş en iyi (k1000) −0.03: sadece 1X2/ÇŞ'de anlamlı küçük katkı (favori-sürpriz sapması, ev −0.28±0.06, ÇŞ X2 −0.42±0.09); gol, KG, kombo, İY/MS, 6+ marketlerinde ≈0.
+- Değer kuralı (ikiz ≥ piyasa × 1.05/1.10/1.20): seçilenlerin gerçekleşmesi piyasa yüzdesinin 0.96-1.03 katı; Kral Oran'la kâr için gereken 1.14 (tekli), 1.19 (kombo), 1.27 (sürpriz). En iyi tekil sonuçlar (iki yarı KG 1.09, X&KG Var 1.05-1.06, z≈2.5-3.3) 37 market × çok eşik içinde çoklu deneme düzeyinde ve yine çıtanın çok altında.
+- Çift uyum kombosu (Ü2.5+KG, MS1+KG, MS1+Ü2.5 vb.): 0.69-1.10, çoğu ≈1.0. "Tuzak" tarafı (ikiz ≤ piyasa × 0.9) gerçek ama küçük: 0.95-0.975 (çekilmiş k1000: 0.87) → uzak durma listesi hafif bilgi taşıyor, kazanç yaratmıyor.
+- Sonuç: ikizler piyasanın aynası; oranın içindeki desen zaten oranda. Daha çok komşu + piyasaya çekme ikizi daha dürüst yapıyor ama İddaa marjını aşacak bir avantaj hiçbir yöntemde, hiçbir market grubunda yok.
+
 ## 📌 Aşama 7 (v3, son faz): Canlı Bildirim
 - Fikir (Çağrı): maç sırasında (örn. 15. dk, favori ev sahibi baskıda, takım 15-30 arasında çok gol atıyor) "oynanabilir" bildirimi.
 - Parçalar: takım bazlı 15 dk gol dağılımı (ESPN gol dakikaları, lig ortalamasına çekilmiş), canlı skor/dakika ve şut (ESPN, 30-60 sn gecikme; tehlikeli atak verisi yok), kalan süre + skor durumlu canlı Poisson, Nesine canlı oranı (incelenmedi), Telegram/Windows bildirimi.
