@@ -5,7 +5,7 @@
 - Keep responses short and in Turkish. No step-by-step tutorials unless asked.
 
 ## 2. Code Style
-- All strings, prints and logs inside code are in English.
+- All strings, prints and logs inside code are in English. Exception: user-facing UI copy under `ui/` is Turkish.
 - Terminal output is minimal and informational (no decorative banners or emojis).
 - No inline comments or docstrings; code should be self-explanatory.
 - Paths come from `data_pipeline/config.py`; DB access goes through `data_pipeline/db.py`.

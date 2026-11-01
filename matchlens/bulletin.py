@@ -90,6 +90,7 @@ def evaluate_match(match, model, odds_row, finder):
     market = market_view(odds_row) if odds_row else {}
     record = {**base, **probs, **market, **twin_view(finder, market, match.kickoff)}
     record["top_scores"] = " ".join(f"{h}-{a}" for h, a, _ in markets.top_scores(matrix, 3))
+    record["rho"] = model.rho
     candidates = []
     if odds_row:
         record.update({k: v for k, v in odds_row.items() if k != "event_id"})
@@ -201,6 +202,16 @@ def save(records, candidates, date):
     records.to_csv(BULLETIN_DIR / f"{date}_matches.csv", index=False)
     if not candidates.empty:
         candidates.to_csv(BULLETIN_DIR / f"{date}_odds.csv", index=False)
+
+
+def save_snapshots(records, candidates):
+    if records.empty:
+        return []
+    local_day = pd.to_datetime(records["kickoff_utc"], utc=True).dt.tz_convert(LOCAL_TZ).dt.date
+    for day, part in records.groupby(local_day):
+        cands = candidates[candidates["event_id"].isin(part["event_id"])] if not candidates.empty else candidates
+        save(part, cands, day)
+    return sorted(set(local_day))
 
 
 def main():

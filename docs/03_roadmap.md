@@ -39,7 +39,7 @@
 - [x] `matchlens/bulletin.py`: `python -m matchlens.bulletin --date YYYY-MM-DD` → fikstür + ESPN Bet365 oranları + model olasılıkları + özel marketler + değer adayları; CSV `data/bulletins/`.
 - [x] Testler: `tests/` (34 test; markets, odds, Dixon-Coles gradyan/sızıntı, backtest).
 - **İlk backtest (31.902 maç, 745 oranlı maç):** 1X2 log-loss model 1.015 / taban 1.072; Bet365 karşısında model 1.004, piyasa 0.981 → **model henüz piyasayı yenmiyor**, ROI -%8..-%13. Over 2.5 kalibrasyonu uçlarda fazla emin (tahmin %30 → gerçek %38, %79 → %71).
-- [ ] Backfill bitince backtest'i tam Bet365 örneklemiyle tekrar koş.
+- [x] Backfill sonrası tam Bet365 örneklemiyle tekrar koşuldu (2026-11-01): 31.902 maç, 17.784 Bet365 oranlı; 1X2 log-loss model 1.0073 / piyasa 0.9880, ROI 1X2 -%9, toplam -%4. Sonuç değişmedi: model piyasayı yenmiyor.
 - [ ] Gol marketleri için kalibrasyon katmanı (gol marketleri daha yüksek küçültmeyi tercih ediyor: ridge≈20).
 - [ ] Model + piyasa harmanı (blend) ve değer eşiğinin backtest ile belirlenmesi.
 
@@ -74,12 +74,12 @@
 - [x] `data_pipeline/ingest_espn.py` + `data_pipeline/espn/` (client / parse / leagues). Ham JSON `data/raw/espn/` altında gzip önbellek; biten maçlar bir daha çekilmez.
 - [x] Scoreboard (lig×yıl tek istek): 43.916 maç, 2016-2026, skor + gol/kart dakikaları (`espn_matches`, `espn_match_events`). Own goal yararlanan takıma yazılıyor; skor/olay tutarlılığı %98.1 (`events_consistent` bayrağı; tutarsızlar ağırlıkla bel/den 2016-17, tur 2018/2022).
 - [x] Kapsam ölçümü (lig-sezon başı 15 maç örneklem): İstatistik (korner/şut/faul/kart/topa sahip olma) Top 5 + eng.2 + usa.1'de 2016'dan beri %100; esp.2 2021+, tur.1 2016-18 ve 2024+, bel.1 2024+, den.1 2024+, nor.1 2024+. Bet365 maç öncesi oran (1X2 + gol çizgisi): Top 5 + eng.2 2018+ büyük ölçüde var; bel/tur kısmi; den/nor/esp.2 (2022+) ve usa.1 neredeyse yok.
-- [ ] Tam summary backfill (~43k maç, ~1.2-1.3 GB) — 2026-11-01'de sınırsız Wi-Fi'de yeniden başlatıldı (~6 istek/sn). Bitince `ingest_espn build` + `coverage`.
+- [x] Tam summary backfill (43.294 maç) Windows'ta bitti (2026-11-01 11:50). Build: 43.916 maç, 20.213 Bet365 oran satırı. `twins_pool`'daki Bet365 maçı 983 → 20.117. İkiz backtest'i (50.837 maç): 1X2 log-loss piyasa 0.9932 / ikiz 0.9970; tüm kurallar yine negatif ROI (Bet365 kaynağında -%2..-%4).
 - [x] Kaggle `adamgbor/club-football-match-data-2000-2025` indirildi (`data/raw/kaggle/club_football/`, 2026-11-01).
 - [ ] Kaggle `archangel0x01/football-odds-movements-2018-2026` (~542 MB, açılış-kapanış ve oran hareketleri) — v2 (Smart Money) için ertelendi.
 - [x] Günlük güncelleme komutu `python -m matchlens.update` (2026-11-01): bu yılın (ve 7 gün önceki yılın) scoreboard'ları → yeni biten + önümüzdeki 7 günün summary'leri → ESPN tablolarının artımlı güncellenmesi (`build --incremental`, sadece ilgili yılların event_id'leri silinip yeniden yazılır) → bekleyen tahminlerin sonuçlandırılması → önümüzdeki 3 günün tahminlerinin `prediction_log`'a yazılması → kümülatif isabet (Brier/log-loss) ve EV>%3 bahis ROI raporu.
 - [x] `prediction_log`: (event_id, market) başına tek satır; maç başlayana kadar her güncellemede son tahmin + o anki Bet365 oranı ile üzerine yazılır, başladıktan sonra donar. 16 market + Asya gol çizgisi. Uzatma/penaltılı biten maçlar void.
-- [x] Günlük çalıştırma: Windows Görev Zamanlayıcı "MatchLens Daily Update" her gün 07:30 (`scripts/register_daily_task.ps1`) → `wsl.exe` ile `scripts/daily_update.sh` (flock kilidi, log `data/logs/update.log`). Bilgisayar o saatte kapalıysa açılınca ilk fırsatta çalışır.
+- [x] Günlük çalıştırma: Windows Görev Zamanlayıcı "MatchLens Daily Update" her gün 07:30 (`scripts/register_daily_task.ps1`) → `scripts/daily_update.ps1` (mutex kilidi, log `data/logs/update.log`). Bilgisayar o saatte kapalıysa açılınca ilk fırsatta çalışır.
 
 ## 🔶 Açık Sorular
 - [ ] Tarihsel Bet365 oranı olmayan lig-sezonlarda backtest/oran ikizleri için ek kaynak (Kaggle'daki football-data aynası tek seferlik indirilebilir).
@@ -108,6 +108,14 @@
 - [ ] **3. Alt Motor (Korner & Kart Motorları):** 3. bölge baskısı (`deep_completions`) ve şut hacminden **Korner ($\gamma_H, \gamma_A$ — `8.5/9.5/10.5 Üst`)**; hakem sertliği (`referee_strictness`) ve pres/faul yoğunluğundan **Kart ($\kappa_H, \kappa_A$ — `3.5/4.5 Üst`)** olasılıklarının üretilmesi.
 - [ ] **4. Alt Motor (Bet365 Tarihsel Oran İkizleri - k-NN Engine):** Maça açılan Bet365 oranlarına tarihte en çok benzeyen 200 maçı tarayıp, oranın beklenen olasılığı ile tarihsel gerçekleşme oranı arasındaki sapmayı (`Pattern Edge`) ve sürpriz/skor dağılımını bulan motorun kurulması.
 - [ ] **Üçlü Onay (Triple-Check) & Value Hesaplayıcı:** `Taktiksel AI` + `Bet365 Oran İkizleri` + `Tarihsel/Dakika İstatistiği` sinyallerini birleştirip 3 Yıldızlı fırsatları puanlayan karar mekanizması.
+
+## 📌 Aşama 5a: Streamlit v1 Arayüzü (2026-11-01)
+- [x] Tasarım önce mockup olarak yapıldı (claude.ai Design tuvali "MatchLens UI"): koyu "maç günü veri masası", Barlow Condensed + Barlow + JetBrains Mono, Model mavi daire / İkiz turuncu baklava / Piyasa beyaz çizgi, uyum yeşil. Çağrı onayladı; tasarım ileride değişebilir.
+- [x] Mimari: motor ↔ arayüz ayrık. `update` her gün `data/bulletins/<tarih>_matches.csv` (+ `_odds.csv`) yazar (`bulletin.save_snapshots`, kayda `rho` eklendi); arayüz bu dosyaları ve `twins_pool`'u sadece okur, DB'ye yazmaz.
+- [x] `ui/data.py` (veri), `ui/views.py` (HTML), `ui/theme.css` (tüm renk/font tokenları tek yerde), `ui/pages/` (Bülten, Maç detayı, Oran İkizleri), `ui/picker.py` (maç seçimi, `?event=` parametresi). Başlatma: `scripts/run_ui.ps1` → http://localhost:8501.
+- [x] `twins_pool`'a `home_team` / `away_team` eklendi; `TwinFinder.twin_table` 200 ikizi uzaklıkla listeler.
+- Not: arayüz metinleri Türkçe (kullanıcıya dönük kopya); kod içi log/print İngilizce kuralı aynen geçerli.
+- [ ] Sonraki: Karne ekranı (prediction_log isabeti), tasarım revizyonu (işler bitince).
 
 ## 📌 Aşama 5: Streamlit "5 Ekranlı Pro Karar Destek Platformu" Arayüzü
 - [ ] **Ekran 1 — Günün AI Fırsatları (Vitrin):** `Oran >= 1.50` ve yüksek Edge filtreli, 3/3 Üçlü Onay rozetli öne çıkan maçlar.

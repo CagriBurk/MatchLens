@@ -26,6 +26,7 @@ def run(leagues, days, workers):
     dates = [today + timedelta(days=i) for i in range(days)]
     records, candidates = bulletin.build(dates, leagues, refresh=False)
     logged = tracking.log_predictions(records, candidates)
+    bulletin.save_snapshots(records, candidates)
     print(f"settled {settled} predictions, logged {logged} predictions for {len(records)} fixtures")
 
     accuracy, betting = tracking.report()

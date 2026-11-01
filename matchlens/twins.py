@@ -24,7 +24,7 @@ MARKETS = [
 HALF_MARKETS = {"ht_over_0.5", "ht_over_1.5", "both_halves_over_1.5", "both_halves_btts", "htft_1/1", "htft_X/X", "htft_2/2", "htft_1/2", "htft_2/1"}
 ODDS_COLUMNS = ["o_home", "o_draw", "o_away", "o_over25", "o_under25"]
 POOL_COLUMNS = ["source", "league", "date", "event_id", "p_home", "p_draw", "p_away", "p_over25",
-                "home_goals", "away_goals", "ht_home", "ht_away", "early_goal"] + ODDS_COLUMNS
+                "home_goals", "away_goals", "ht_home", "ht_away", "early_goal", "home_team", "away_team"] + ODDS_COLUMNS
 MINUTE = re.compile(r"(\d+)")
 
 
@@ -71,7 +71,7 @@ def kaggle_rows():
     df["o_under25"] = df["odds_under25"].where(ou)
     df["early_goal"] = np.nan
     df["source"] = "kaggle"
-    return df.rename(columns={"espn_event_id": "event_id"})
+    return df.rename(columns={"espn_event_id": "event_id", "home_name": "home_team", "away_name": "away_team"})
 
 
 def footystats_rows():
@@ -85,7 +85,7 @@ def footystats_rows():
     df["o_over25"] = df["odds_over25"].where(df["odds_over25"] > 1)
     df["o_under25"] = np.nan
     df["source"] = "footystats"
-    return df.rename(columns={"espn_event_id": "event_id"})
+    return df.rename(columns={"espn_event_id": "event_id", "home_name": "home_team", "away_name": "away_team"})
 
 
 def build_pool():
@@ -97,7 +97,7 @@ def build_pool():
     espn["ht_away"] = espn["ht_away"].where(consistent)
     espn["early_goal"] = (espn["early_goals"] > 0).astype(float).where(consistent)
     outcome_cols = ["home_goals", "away_goals", "ht_home", "ht_away", "early_goal"]
-    truth = espn.set_index("event_id")[outcome_cols + ["league", "date"]]
+    truth = espn.set_index("event_id")[outcome_cols + ["league", "date", "home_team", "away_team"]]
 
     sources = [espn_rows(espn), kaggle_rows(), footystats_rows()]
     frames = []
@@ -113,7 +113,8 @@ def build_pool():
     missing_over = linked["p_over25"].isna()
     linked.loc[missing_over, ["p_over25", "o_over25", "o_under25"]] = over_fill.reindex(linked.index[missing_over]).to_numpy()
     known = linked.index.intersection(truth.index)
-    linked.loc[known, ["home_goals", "away_goals", "league", "date"]] = truth.loc[known, ["home_goals", "away_goals", "league", "date"]].to_numpy()
+    truth_cols = ["home_goals", "away_goals", "league", "date", "home_team", "away_team"]
+    linked.loc[known, truth_cols] = truth.loc[known, truth_cols].to_numpy()
     for column in ("ht_home", "ht_away", "early_goal"):
         linked.loc[known, column] = truth.loc[known, column].to_numpy()
     linked[["ht_home", "ht_away"]] = linked[["ht_home", "ht_away"]].fillna(half_fill.reindex(linked.index))
@@ -207,11 +208,22 @@ class TwinFinder:
         hits = np.nansum(values, axis=1)
         return hits, counts
 
-    def summarize(self, p_home, p_away, p_over=None, before=None, k=K):
+    def search(self, p_home, p_away, p_over=None, before=None, k=K):
         use_over = p_over is not None and np.isfinite(p_over)
         point = [p_home, p_away, p_over] if use_over else [p_home, p_away]
         before = np.datetime64("now") if before is None else np.datetime64(pd.Timestamp(before).tz_localize(None) if pd.Timestamp(before).tzinfo else pd.Timestamp(before))
         found, radius = self.neighbours(np.array([point]), [before], k=k, use_over=use_over)
+        return point, use_over, found, radius
+
+    def twin_table(self, p_home, p_away, p_over=None, before=None, k=K):
+        point, _, found, _ = self.search(p_home, p_away, p_over, before, k)
+        table = self.pool.loc[found[0][found[0] >= 0]].copy()
+        axes = ["p_home", "p_away", "p_over25"][:len(point)]
+        table["distance"] = np.linalg.norm(table[axes].to_numpy() - np.array(point), axis=1)
+        return table.reset_index(drop=True)
+
+    def summarize(self, p_home, p_away, p_over=None, before=None, k=K):
+        _, use_over, found, radius = self.search(p_home, p_away, p_over, before, k)
         row = found[0][found[0] >= 0]
         hits, counts = self.frequencies(found)
         summary = {"n": len(row), "radius": float(radius[0]), "used_over": use_over}

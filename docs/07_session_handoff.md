@@ -30,6 +30,7 @@ Bet365 oranı modele **girmez**. Her maç için üç bağımsız bilgi yan yana:
 .venv\Scripts\python -m data_pipeline.run_pipeline kaggle footystats
 .venv\Scripts\python -m data_pipeline.ingest_espn scoreboards|summaries|build|coverage [--incremental]
 .venv\Scripts\python -m pytest -q -p no:seleniumbase tests
+powershell -File scripts\run_ui.ps1                         # arayüz: http://localhost:8501
 ```
 
 ## 5. Veri
@@ -49,4 +50,4 @@ Bet365 oranı modele **girmez**. Her maç için üç bağımsız bilgi yan yana:
 1. İleriye dönük kaydı izlemek (her sabah update raporu).
 2. Modeli güçlendirmek (Çağrı'nın planı: ikizlerden sağlam veri gelince): ligler arası Elo, Understat xG (Top 5), yorgunluk/UEFA, kadro. Her ekleme `calibration` ve twins backtest'iyle ölçülür.
 3. İkizlerde aynı lig/ligler arası ağırlık, k ve mesafe ölçüsü denemeleri.
-4. Streamlit arayüzü (v2), korner/kart motorları (v2).
+4. Arayüz: v1 hazır (Bülten / Maç detayı / Oran İkizleri, `scripts/run_ui.ps1`). Sıradaki: Karne ekranı (prediction_log), korner/kart motorları (v2).

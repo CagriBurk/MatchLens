@@ -73,3 +73,17 @@ def test_early_goal_from_timings():
     assert twins.early_from_timings("30,90'8", None) == 0.0
     assert twins.early_from_timings("45'1", "12") == 1.0
     assert twins.early_from_timings(None, None) == 0.0
+
+
+def test_twin_table_lists_sorted_neighbours_with_distance(finder):
+    table = finder.twin_table(0.45, 0.3, 0.5, before="2030-01-01", k=40)
+    summary = finder.summarize(0.45, 0.3, 0.5, before="2030-01-01", k=40)
+    assert len(table) == 40
+    assert table["distance"].is_monotonic_increasing
+    assert table["distance"].iloc[-1] == pytest.approx(summary["radius"])
+
+
+def test_twin_table_respects_cutoff(finder):
+    table = finder.twin_table(0.45, 0.3, None, before="2016-01-01", k=50)
+    assert (table["date"] < pd.Timestamp("2016-01-01")).all()
+    assert table["distance"].notna().all()
