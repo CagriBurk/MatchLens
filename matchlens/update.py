@@ -24,8 +24,10 @@ def run_coupons(records, today, settled_legs, force=False):
         nesine.save(offers)
         print(f"nesine: matched {len(matched)} of {len(records)} fixtures, {len(offers)} odds")
     local_day = pd.to_datetime(records["kickoff_utc"], utc=True).dt.tz_convert(bulletin.LOCAL_TZ).dt.date
-    made = coupons.generate(today, records[local_day.eq(today)], offers, force=force)
-    print(f"coupons: settled {settled_legs} legs, wrote {made} legs for {today}")
+    todays = records[local_day.eq(today)]
+    made = coupons.generate(today, todays, offers, force=force)
+    picks = coupons.log_selections(today, todays, offers, force=force)
+    print(f"coupons: settled {settled_legs[0]} legs and {settled_legs[1]} selections, wrote {made} legs and {picks} selections for {today}")
 
 
 def run(leagues, days, workers, force_coupons=False):

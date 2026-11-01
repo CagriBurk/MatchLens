@@ -73,3 +73,17 @@ def test_scorecard_views_render():
         sv.coupon_history_section(scorecard.coupon_results(coupon_legs())),
     ])
     assert "EN İYİ" in html and "tuttu" in html and "yattı" in html
+
+
+def test_rule_table_splits_by_source_and_group():
+    picks = pd.DataFrame([
+        {"key": "home", "odds": 2.0, "p_model": 0.55, "p_twin": 0.45, "p_ref": 0.5, "outcome": 1.0},
+        {"key": "away&btts_yes", "odds": 5.0, "p_model": 0.15, "p_twin": 0.25, "p_ref": 0.2, "outcome": 0.0},
+        {"key": "under_3.5", "odds": 1.5, "p_model": 0.70, "p_twin": None, "p_ref": 0.65, "outcome": 1.0},
+    ])
+    table = scorecard.rule_table(picks).set_index(["rule", "group"])
+    assert table.loc[("model", "all"), "n"] == 2 and table.loc[("model", "all"), "roi"] == pytest.approx(0.75)
+    assert table.loc[("twin", "all"), "n"] == 1 and table.loc[("twin", "combo"), "roi"] == pytest.approx(-1.0)
+    assert table.loc[("all", "all"), "n"] == 3
+    from ui import scorecard_views as sv
+    assert "Kural karnesi" in sv.rule_section(scorecard.rule_table(picks))

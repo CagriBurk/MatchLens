@@ -2,15 +2,16 @@ import numpy as np
 import pandas as pd
 
 from data_pipeline.db import connect
-from matchlens import odds
+from matchlens import coupons, odds, selections
 
 MIN_EV = 0.03
 LOG_MARKETS = [
     "home", "draw", "away", "dc_1x", "dc_12", "dc_x2", "over_1.5", "over_2.5", "over_3.5", "btts_yes",
     "ht_over_0.5", "ht_over_1.5", "both_halves_over_1.5", "both_halves_btts", "goals_6plus", "early_goal_0_15",
-    "htft_1/2", "htft_2/1",
+    "htft_1/2", "htft_2/1", "ht_home", "ht_draw", "ht_away", "htft_1/1", "htft_1/X", "htft_X/1", "htft_X/X", "htft_X/2",
+    "htft_2/X", "htft_2/2", *selections.COMBOS,
 ]
-HALF_MARKETS = {"ht_over_0.5", "ht_over_1.5", "both_halves_over_1.5", "both_halves_btts", "early_goal_0_15", "htft_1/2", "htft_2/1"}
+DIRECT_MARKETS = {"home", "draw", "away", "over_2.5"}
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS prediction_log (
     event_id TEXT NOT NULL, market TEXT NOT NULL, league TEXT, kickoff_utc TEXT,
@@ -58,6 +59,16 @@ def market_source(record, market):
     return None
 
 
+def market_view(record, market):
+    ref = record.get(f"ref_{market}")
+    if ref is not None and not pd.isna(ref):
+        return ref, coupons.reference_source(record, market)
+    direct = record.get(f"market_{market}")
+    if direct is None or pd.isna(direct):
+        return None, None
+    return direct, market_source(record, market)
+
+
 def prediction_rows(records, candidates, logged_at):
     priced = {}
     if not candidates.empty:
@@ -67,8 +78,9 @@ def prediction_rows(records, candidates, logged_at):
         base = {field: record[field] for field in MATCH_FIELDS}
         for market in LOG_MARKETS:
             offer = priced.get((record["event_id"], market), {})
+            market_p, market_src = market_view(record, market)
             rows.append({**base, "market": market, "model_p": record[market], "twin_p": record.get(f"twin_{market}"),
-                         "market_p": record.get(f"market_{market}"), "market_src": market_source(record, market), "line": None,
+                         "market_p": market_p, "market_src": market_src, "line": None,
                          "b365": offer.get("b365"), "ev": offer.get("ev"), "logged_at": logged_at})
     if not candidates.empty:
         meta = records.set_index("event_id")[["lam_home", "lam_away"]].to_dict("index")
@@ -92,26 +104,11 @@ def log_predictions(records, candidates, now=None):
 
 
 def market_outcome(market, match):
-    hg, ag = match["home_goals"], match["away_goals"]
-    total = hg + ag
-    if market in HALF_MARKETS and not match["events_consistent"]:
+    if market != "early_goal_0_15":
+        return coupons.leg_outcome(market, match)
+    if not match["events_consistent"] or pd.isna(match["ht_home"]) or pd.isna(match["ht_away"]):
         return None
-    ht_h, ht_a = match["ht_home"], match["ht_away"]
-    sh_h, sh_a = hg - ht_h, ag - ht_a
-    outcomes = {
-        "home": hg > ag, "draw": hg == ag, "away": hg < ag,
-        "dc_1x": hg >= ag, "dc_12": hg != ag, "dc_x2": hg <= ag,
-        "over_1.5": total > 1.5, "over_2.5": total > 2.5, "over_3.5": total > 3.5,
-        "btts_yes": hg > 0 and ag > 0,
-        "ht_over_0.5": ht_h + ht_a > 0.5, "ht_over_1.5": ht_h + ht_a > 1.5,
-        "both_halves_over_1.5": ht_h + ht_a >= 2 and sh_h + sh_a >= 2,
-        "both_halves_btts": ht_h > 0 and ht_a > 0 and sh_h > 0 and sh_a > 0,
-        "goals_6plus": total >= 6, "early_goal_0_15": match["early_goals"] > 0,
-        "htft_1/2": ht_h > ht_a and hg < ag, "htft_2/1": ht_h < ht_a and hg > ag,
-    }
-    if market in outcomes:
-        return float(outcomes[market])
-    return None
+    return float(match["early_goals"] > 0)
 
 
 def market_profit(row, match):

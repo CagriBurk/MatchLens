@@ -66,8 +66,13 @@ def test_generate_and_settle_roundtrip():
     assert coupons.generate("2030-01-01", records, offers, now=pd.Timestamp("2029-12-31", tz="UTC")) == 0
     matches = pd.DataFrame([{"event_id": str(i), "state": "post", "regular": True, "home_goals": 1.0, "away_goals": 0.0,
                              "ht_home": 0.0, "ht_away": 0.0, "events_consistent": True} for i in range(4)])
-    assert coupons.settle(matches) == written
+    now = pd.Timestamp("2029-12-31", tz="UTC")
+    assert coupons.log_selections("2030-01-01", records, offers, now=now) == 4
+    assert coupons.log_selections("2030-01-01", records, offers, now=now) == 0
+    assert coupons.settle(matches) == (written, 4)
     assert (coupons.load("2030-01-01")["outcome"] == 1.0).all()
+    picks = coupons.load_selections()
+    assert len(picks) == 4 and picks["outcome"].eq(1.0).all() and picks["p_ref"].eq(0.66).all()
 
 
 def test_nesine_parsing_and_matching():

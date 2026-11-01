@@ -117,6 +117,29 @@ def coupon_summary_section(summary, legs):
                    grid("minmax(150px,1.2fr) repeat(8, minmax(80px,1fr))", head, rows, 990))
 
 
+RULE_LABEL = {"model": ("Model ≥ Piyasa", "#38BDF8"), "twin": ("İkiz ≥ Piyasa", "#F59E0B"), "all": ("Hepsi (kural yok)", "#9CA3AF")}
+GROUP_LABEL = {"all": "Toplam", "result": "MS 1X2", "double_chance": "Çifte şans", "totals": "Alt/Üst", "btts": "KG",
+               "combo": "Kombo", "first_half": "İlk yarı", "special": "İY/MS, 6+, iki yarı"}
+
+
+def rule_section(table):
+    rows = []
+    for _, row in table.iterrows():
+        label, color = RULE_LABEL[row["rule"]]
+        total = row["group"] == "all"
+        weight = "font-weight:700" if total else ""
+        rows.append([f'<span class="ml-label" style="color:{color};{weight}">{label if total else ""}</span>',
+                     f'<span style="font-family:var(--ml-body);{weight}">{GROUP_LABEL[row["group"]]}</span>', r(int(row["n"])),
+                     r(pct(row["mean_p"], 1), f"color:{color}"), r(pct(row["mean_ref"], 1)), r(pct(row["actual"], 1), "color:#22C55E;font-weight:700"),
+                     r(signed(row["roi"]) if pd.notna(row["roi"]) else "—")])
+    head = ["<span>Kural</span>", "<span>Market</span>", r("n"), r("Kaynak %"), r("Piyasa %"), r("Gerçek %", "color:#22C55E"), r("ROI (puan)")]
+    body = grid("minmax(150px,1.2fr) minmax(150px,1.2fr) 64px repeat(4, minmax(80px,1fr))", head, rows, 860) if rows else empty(
+        "Henüz sonuçlanmış seçim yok. Her sabah İddaa'daki tüm seçimler kaydediliyor; maçlar bittikçe burada birikecek.")
+    return section("Kural karnesi: tüm İddaa seçimleri",
+                   "Kuponlara girsin girmesin, o günün tüm seçimleri · kaynak piyasadan yüksek dediğinde gerçekte ne oldu · ROI İddaa oranıyla düz 1 birim",
+                   body)
+
+
 def coupon_history_section(results):
     rows = []
     for _, row in results.sort_values(["day", "coupon"], ascending=[False, True]).head(42).iterrows():

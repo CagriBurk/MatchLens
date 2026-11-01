@@ -1,6 +1,6 @@
 import streamlit as st
 
-from matchlens import scorecard
+from matchlens import coupons, scorecard
 from ui import scorecard_views as sv
 from ui import views
 
@@ -24,6 +24,7 @@ else:
     st.html(views.page(sv.calibration_section(scorecard.calibration(log, scorecard.SOURCES[source]), source)))
     st.html(views.page(sv.market_source_section(scorecard.market_source_table(log))))
 
+st.html(views.page(sv.rule_section(scorecard.rule_table(coupons.load_selections()))))
 st.html(views.page(sv.coupon_summary_section(scorecard.coupon_summary(results), scorecard.leg_summary(legs))))
 st.html(views.page(sv.coupon_history_section(results)))
 st.html(views.page('<p class="ml-note">Brier: (olasılık − sonuç)² ortalaması; her zaman %50 diyen bir tahmin 0.25 alır. '

@@ -65,6 +65,9 @@ def test_settle_outcomes_and_profit():
     assert log.loc["early_goal_0_15", "outcome"] == 1.0
     assert log.loc["htft_1/2", "outcome"] == 0.0
     assert log.loc["htft_2/1", "outcome"] == 0.0
+    assert log.loc["home&btts_yes", "outcome"] == 1.0
+    assert log.loc["ht_home", "outcome"] == 1.0
+    assert log.loc["htft_1/1", "outcome"] == 1.0
     assert log.loc["asian_over", "profit"] == pytest.approx(0.45)
 
 
@@ -106,3 +109,14 @@ def test_report_after_settlement():
     accuracy, betting = tracking.report(min_ev=0.0)
     assert accuracy.loc["home", "actual"] == 1.0
     assert betting.loc["ALL", "bets"] >= 1
+
+
+def test_market_probability_prefers_reference_and_marks_derived():
+    records, candidates = fixture_frames()
+    records = records.assign(**{"market_home": 0.5, "market_src": "b365", "ref_home": 0.5, "ref_btts_yes": 0.55,
+                                "ref_over_2.5": 0.52, "ref_src": "b365", "ref_ou_src": "dk"})
+    tracking.log_predictions(records, candidates, now=NOW)
+    log = read_log()
+    assert log.loc["home", "market_src"] == "b365" and log.loc["over_2.5", "market_src"] == "dk"
+    assert log.loc["btts_yes", "market_p"] == 0.55 and log.loc["btts_yes", "market_src"] == "b365~"
+    assert pd.isna(log.loc["draw", "market_p"])

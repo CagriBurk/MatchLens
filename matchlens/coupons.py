@@ -27,6 +27,16 @@ CREATE TABLE IF NOT EXISTS coupon_log (
     PRIMARY KEY (day, coupon, leg)
 )
 """
+SELECTION_SCHEMA = """
+CREATE TABLE IF NOT EXISTS selection_log (
+    day TEXT NOT NULL, event_id TEXT NOT NULL, key TEXT NOT NULL, league TEXT, kickoff_utc TEXT, home_team TEXT, away_team TEXT,
+    odds REAL, mbs INTEGER, p_model REAL, p_twin REAL, p_ref REAL, ref_src TEXT, p_book REAL, created_at TEXT,
+    home_goals REAL, away_goals REAL, outcome REAL, settled_at TEXT,
+    PRIMARY KEY (event_id, key)
+)
+"""
+SELECTION_FIELDS = ["day", "event_id", "key", "league", "kickoff_utc", "home_team", "away_team", "odds", "mbs",
+                    "p_model", "p_twin", "p_ref", "ref_src", "p_book", "created_at"]
 ADDED_COLUMNS = {"p_book": "REAL", "p_ref": "REAL", "ref_src": "TEXT"}
 FIELDS = ["day", "coupon", "leg", "event_id", "league", "kickoff_utc", "home_team", "away_team", "key", "odds", "mbs",
           "p_model", "p_twin", "p_safe", "p_book", "p_ref", "ref_src", "value", "created_at"]
@@ -128,6 +138,7 @@ def summary(legs):
 
 def ensure_schema(conn):
     conn.execute(SCHEMA)
+    conn.execute(SELECTION_SCHEMA)
     existing = {row[1] for row in conn.execute("PRAGMA table_info(coupon_log)")}
     for column, kind in ADDED_COLUMNS.items():
         if column not in existing:
@@ -140,12 +151,31 @@ def exists(day):
         return conn.execute("SELECT 1 FROM coupon_log WHERE day = ? LIMIT 1", (str(day),)).fetchone() is not None
 
 
+def upcoming_only(records, now):
+    return records[pd.to_datetime(records["kickoff_utc"], utc=True) > now]
+
+
+def log_selections(day, records, offers, now=None, force=False):
+    now = now or pd.Timestamp.now(tz="UTC")
+    cands = candidates(upcoming_only(records, now), offers)
+    if cands.empty:
+        return 0
+    cands = cands.assign(day=str(day), created_at=now.isoformat())
+    rows = [{k: (None if pd.isna(v) else v) for k, v in row.items()} for row in cands[SELECTION_FIELDS].to_dict("records")]
+    verb = "INSERT OR REPLACE" if force else "INSERT OR IGNORE"
+    with connect() as conn:
+        ensure_schema(conn)
+        before = conn.total_changes
+        conn.executemany(f"{verb} INTO selection_log ({', '.join(SELECTION_FIELDS)}) "
+                         f"VALUES ({', '.join(':' + f for f in SELECTION_FIELDS)}) ", rows)
+        return conn.total_changes - before
+
+
 def generate(day, records, offers, now=None, force=False):
     if exists(day) and not force:
         return 0
     now = now or pd.Timestamp.now(tz="UTC")
-    upcoming = records[pd.to_datetime(records["kickoff_utc"], utc=True) > now]
-    made = make(upcoming, offers)
+    made = make(upcoming_only(records, now), offers)
     rows = []
     for coupon, legs in made.items():
         for i, leg in enumerate(legs, start=1):
@@ -169,24 +199,35 @@ def leg_outcome(key, match):
     return float(half[key]) if key in half else None
 
 
+def settle_table(conn, table, keys, done, now):
+    columns = list(dict.fromkeys([*keys, "event_id", "key"]))
+    pending = pd.read_sql_query(f"SELECT {', '.join(columns)} FROM {table} WHERE settled_at IS NULL", conn, dtype={"event_id": str})
+    updates = []
+    for row in pending.to_dict("records"):
+        if row["event_id"] not in done.index:
+            continue
+        match = done.loc[row["event_id"]]
+        outcome = leg_outcome(row["key"], match) if match["regular"] else None
+        updates.append((match["home_goals"], match["away_goals"], outcome, now.isoformat(), *(row[k] for k in keys)))
+    where = " AND ".join(f"{k} = ?" for k in keys)
+    conn.executemany(f"UPDATE {table} SET home_goals = ?, away_goals = ?, outcome = ?, settled_at = ? WHERE {where}", updates)
+    return len(updates)
+
+
 def settle(matches, now=None):
     now = now or pd.Timestamp.now(tz="UTC")
+    done = matches[matches["state"].eq("post")].assign(event_id=lambda d: d["event_id"].astype(str)).set_index("event_id")
     with connect() as conn:
         ensure_schema(conn)
-        pending = pd.read_sql_query("SELECT day, coupon, leg, event_id, key FROM coupon_log WHERE settled_at IS NULL", conn)
-        if pending.empty:
-            return 0
-        done = matches[matches["state"].eq("post")].assign(event_id=lambda d: d["event_id"].astype(str)).set_index("event_id")
-        updates = []
-        for leg in pending.itertuples():
-            if leg.event_id not in done.index:
-                continue
-            match = done.loc[leg.event_id]
-            outcome = leg_outcome(leg.key, match) if match["regular"] else None
-            updates.append((match["home_goals"], match["away_goals"], outcome, now.isoformat(), leg.day, leg.coupon, leg.leg))
-        conn.executemany("UPDATE coupon_log SET home_goals = ?, away_goals = ?, outcome = ?, settled_at = ? "
-                         "WHERE day = ? AND coupon = ? AND leg = ?", updates)
-    return len(updates)
+        legs = settle_table(conn, "coupon_log", ["day", "coupon", "leg"], done, now)
+        picks = settle_table(conn, "selection_log", ["event_id", "key"], done, now)
+    return legs, picks
+
+
+def load_selections():
+    with connect() as conn:
+        ensure_schema(conn)
+        return pd.read_sql_query("SELECT * FROM selection_log WHERE outcome IS NOT NULL", conn, dtype={"event_id": str})
 
 
 def load(day=None):

@@ -67,7 +67,7 @@ def calibration(log, column, bins=BINS):
 
 
 def market_source_table(log):
-    priced = log.dropna(subset=["market_p"]) if "market_src" in log else log.iloc[0:0]
+    priced = log[log["market"].isin(tracking.DIRECT_MARKETS)].dropna(subset=["market_p"]) if "market_src" in log else log.iloc[0:0]
     rows = []
     for src, group in priced.groupby(priced["market_src"].fillna("?")):
         rows.append({"source": src, **scores(group["market_p"], group["outcome"]),
@@ -123,3 +123,42 @@ def leg_summary(legs):
 
 def load_coupons():
     return coupons.load()
+
+
+def selection_group(key):
+    if "&" in key:
+        return "combo"
+    if key in ("home", "draw", "away"):
+        return "result"
+    if key.startswith("dc_"):
+        return "double_chance"
+    if key.startswith(("over_", "under_")):
+        return "totals"
+    if key.startswith("btts"):
+        return "btts"
+    if key.startswith("ht_"):
+        return "first_half"
+    return "special"
+
+
+RULES = {"model": "p_model", "twin": "p_twin", "all": "p_ref"}
+GROUPS = ("result", "double_chance", "totals", "btts", "combo", "first_half", "special")
+
+
+def rule_table(selections):
+    columns = ["rule", "group", "n", "mean_p", "mean_ref", "actual", "roi"]
+    if selections.empty:
+        return pd.DataFrame(columns=columns)
+    selections = selections.dropna(subset=["outcome", "p_ref"]).assign(group=lambda d: d["key"].map(selection_group))
+    rows = []
+    for rule, column in RULES.items():
+        picked = selections.dropna(subset=[column])
+        if rule != "all":
+            picked = picked[picked[column] >= picked["p_ref"]]
+        for group in ("all", *GROUPS):
+            part = picked if group == "all" else picked[picked["group"].eq(group)]
+            if part.empty:
+                continue
+            rows.append({"rule": rule, "group": group, "n": len(part), "mean_p": part[column].mean(), "mean_ref": part["p_ref"].mean(),
+                         "actual": part["outcome"].mean(), "roi": (part["outcome"] * part["odds"] - 1).mean()})
+    return pd.DataFrame(rows, columns=columns)
