@@ -5,7 +5,8 @@ import pandas as pd
 from scipy.optimize import minimize
 
 XI = 0.0019
-RIDGE = 5.0
+RIDGE = 3.0
+RIDGE_STYLE = 30.0
 WINDOW_DAYS = 1460
 NEWCOMER_PRIOR = -0.15
 NEWCOMER_DAYS = 300
@@ -67,7 +68,8 @@ def tau_terms(x, y, lam, mu, rho):
     return tau, d_lam / tau, d_mu / tau, d_rho / tau
 
 
-def neg_log_likelihood(params, hi, ai, hg, ag, w, n, prior_att, prior_def, ridge):
+def neg_log_likelihood(params, hi, ai, hg, ag, w, n, prior_att, prior_def, ridge, ridge_style=None):
+    ridge_style = ridge if ridge_style is None else ridge_style
     mu, home, rho = params[0], params[1], params[2]
     att, dfn = params[3:3 + n], params[3 + n:]
     log_lam = mu + home + att[hi] - dfn[ai]
@@ -78,15 +80,16 @@ def neg_log_likelihood(params, hi, ai, hg, ag, w, n, prior_att, prior_def, ridge
         return 1e12, np.zeros_like(params)
     ll = np.log(tau) + hg * log_lam - lam + ag * log_mu - mu_
     att_dev, def_dev = att - prior_att, dfn - prior_def
-    value = -np.sum(w * ll) + ridge * (np.sum(att_dev ** 2) + np.sum(def_dev ** 2))
+    strength, style = att_dev + def_dev, att_dev - def_dev
+    value = -np.sum(w * ll) + 0.5 * (ridge * np.sum(strength ** 2) + ridge_style * np.sum(style ** 2))
     g_h = w * (hg - lam + g_lam_tau)
     g_a = w * (ag - mu_ + g_mu_tau)
     grad = np.zeros_like(params)
     grad[0] = -(g_h.sum() + g_a.sum())
     grad[1] = -g_h.sum()
     grad[2] = -np.sum(w * g_rho_tau)
-    grad[3:3 + n] = -(np.bincount(hi, g_h, n) + np.bincount(ai, g_a, n)) + 2 * ridge * att_dev
-    grad[3 + n:] = (np.bincount(ai, g_h, n) + np.bincount(hi, g_a, n)) + 2 * ridge * def_dev
+    grad[3:3 + n] = -(np.bincount(hi, g_h, n) + np.bincount(ai, g_a, n)) + ridge * strength + ridge_style * style
+    grad[3 + n:] = (np.bincount(ai, g_h, n) + np.bincount(hi, g_a, n)) + ridge * strength - ridge_style * style
     return value, grad
 
 
@@ -104,7 +107,7 @@ def half_shares(matches):
 
 
 def fit(matches: pd.DataFrame, ref_date, xi=XI, ridge=RIDGE, window_days=WINDOW_DAYS, warm_start=None,
-        targets=("home_goals", "away_goals"), fixed_rho=None):
+        targets=("home_goals", "away_goals"), fixed_rho=None, ridge_style=RIDGE_STYLE):
     ref_date = pd.Timestamp(ref_date)
     days_ago = (ref_date - matches["kickoff"]).dt.total_seconds() / 86400
     train = matches[(days_ago > 0) & (days_ago <= window_days)]
@@ -147,7 +150,7 @@ def fit(matches: pd.DataFrame, ref_date, xi=XI, ridge=RIDGE, window_days=WINDOW_
     bounds = [(None, None), (None, None), rho_bounds] + [(-3, 3)] * (2 * n)
     result = minimize(
         neg_log_likelihood, x0, jac=True, method="L-BFGS-B", bounds=bounds,
-        args=(hi, ai, hg, ag, w, n, prior_att, prior_def, ridge),
+        args=(hi, ai, hg, ag, w, n, prior_att, prior_def, ridge, ridge_style),
     )
     params = result.x
     attack, defence = params[3:3 + n], params[3 + n:]

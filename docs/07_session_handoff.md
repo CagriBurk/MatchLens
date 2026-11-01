@@ -1,4 +1,4 @@
-# MatchLens — Oturum Devir Notu (2026-11-01 akşam)
+# MatchLens — Oturum Devir Notu (2026-11-01 gece)
 
 Yeni oturum önce bunu, sonra `docs/03_roadmap.md` (Aşama 4-5a ve 7) ve `.agents/AGENTS.md` dosyalarını okumalı.
 
@@ -16,7 +16,7 @@ Yeni oturum önce bunu, sonra `docs/03_roadmap.md` (Aşama 4-5a ve 7) ve `.agent
 
 ## 3. Ürün
 Her maç için bağımsız kaynaklar yan yana (Bet365 oranı modele girmez):
-- **Model** (`dixon_coles.py` + `markets.py` + `goal_calibration.py`): sadece geçmiş maç verisi; skor matrisi toplam gol × KG grubuna göre yeniden ağırlıklandırılıyor.
+- **Model** (`dixon_coles.py` + `markets.py` + `goal_calibration.py`): sadece geçmiş maç verisi; ayrık ridge (güç 3 / stil 30); skor matrisi toplam gol × KG grubuna göre yeniden ağırlıklandırılıyor.
 - **Oran İkizleri** (`twins.py`): marjsız 1/2/Ü2.5'e en yakın 200 geçmiş maçın gerçek sonuçları (kombolar dahil).
 - **Piyasa**: Bet365, yoksa DraftKings (ESPN summary); 2.5 çizgisi yoksa Asya çizgisinden çevrilir (`~`). Kapsama ~%95.
 - **İddaa (Nesine)** (`data_pipeline/nesine.py`): sadece kupon oranları ve İddaa marjsız yüzdesi.
@@ -27,7 +27,7 @@ Her maç için bağımsız kaynaklar yan yana (Bet365 oranı modele girmez):
 .venv\Scripts\python -m matchlens.update [--rebuild-coupons]
 .venv\Scripts\python -m matchlens.bulletin --date 2026-11-08
 .venv\Scripts\python -m matchlens.twins build|backtest          # backtest -> twins_backtest tablosu
-.venv\Scripts\python -m matchlens.backtest                      # model walk-forward -> backtest_predictions + goal weights
+.venv\Scripts\python -m matchlens.backtest [--ridge 3 --ridge-style 30]  # model walk-forward -> backtest_predictions + goal weights
 .venv\Scripts\python -m matchlens.goal_calibration              # goal weights yeniden hesapla
 .venv\Scripts\python -m matchlens.health --label X --weights none|tune|saved   # sağlık raporu -> data/reports/
 .venv\Scripts\python -m matchlens.calibration
@@ -42,13 +42,15 @@ powershell -File scripts\run_ui.ps1
 - `data/model/goal_weights.json`, `data/raw/nesine/` (günlük ~1.8 MB), `data/reports/health_*.md|json`.
 
 ## 6. Dürüst Durum
-- Model 1X2'de iyi kalibre ama Bet365'ten zayıf (log-loss 1.007 vs 0.988). Hiçbir bahis kuralı tarihsel olarak kâr etmiyor; İddaa marjı ~%15-19 (Üst/KG Var tarafına daha çok yüklü).
-- **Sağlık raporu (son sınav ≥2024-07, ~10k maç, ağırlıklar sadece ayar döneminden):** 1X2 ve MS kombo marketleri GEÇTİ. Üst 1.5/2.5/3.5, KG, KG+Üst, İY gol marketleri KALDI: kalibrasyon eğimi 0.65-0.80 (tahminler fazla uçlara yayılıyor). Model "Üst %30-40" dediğinde gerçek %43, "%40-50" → %48; gol beklentisi <2.2 olan maçlarda Üst 7 puan, 2.2-2.6'da 3 puan eksik; ≥2.6'da doğru. Kuponlardaki Alt yığılmasının asıl kaynağı bu. İkizler aynı maçlarda daha iyi (Ü2.5 log-loss 0.673 vs 0.679). 2026 olağandışı gollü: ikizler bile Üst'ü 2 puan eksik veriyor.
+- Model 1X2'de iyi kalibre ama Bet365'ten zayıf (Bet365 oranlı maçlarda log-loss 1.0067 vs 0.988). Hiçbir bahis kuralı tarihsel olarak kâr etmiyor; İddaa marjı ~%15-19 (Üst/KG Var tarafına daha çok yüklü).
+- **Adım 2 yapıldı (2026-11-01 akşam):** Dixon-Coles'ta ayrık ridge: güç (atak+savunma → 1X2) 3, stil (atak−savunma → gol toplamı) 30. Eski tek ridge 5 gol toplamını fazla açıyor (eğim 0.77), 1X2'yi fazla küçültüyordu. Sağlık raporu son sınav (≥2024-07, ~10k maç): 12 GEÇTİ / 7 KALDI (önce 10/9); Üst 1.5/2.5/3.5 eğimleri 0.95-1.03, tüm marketlerde log-loss iyileşti veya aynı. Kabul şartı harfiyen sağlanmadı, Çağrı uygulama kararı verdi.
+- **Kalan hatalar:** (1) Üst 2.5/3.5, KG+Üst, İY 0.5, iki yarı 1.5 Üst sadece sapmadan kalıyor ve tamamı 2026: Üst 2.5 sapması 2024/25 −0.2, 2026 −3.4 puan (ikizler −2.0); 2026'da maç başı gol +0.12. (2) KG eğimi 0.75 — toplamdan bağımsız gerçek zaaf; FootyStats KG piyasası eğim ~1.0 tutturuyor. λ-koşullu ağırlık ve KG matris eğme denendi, kazanç çok küçük olduğu için uygulanmadı. (3) İY/MS 1/2 eğimi 0.63 (nadir olay, gürültülü). İkizler hâlâ gol marketlerinde modelden biraz iyi (Ü2.5 0.6729 vs 0.6774).
+- Deney betikleri/varyant tahminleri oturum scratchpad'indeydi (kalıcı değil); tekrar için `backtest --ridge X --ridge-style Y` + `health`.
 
-## 7. Sıradaki İş (onaylandı, başlanmadı)
-**Adım 2: hedefli yeniden ayar** (~1.5 saat, çoğu arka plan hesap):
-- Hipotez: gol toplamı tahminlerini lig ortalamasına doğru daraltmak, ev/deplasman güç farkını (1X2) bozmadan.
-- Deneyler: (a) gol tarafı için daha güçlü ridge / ayrı ayar (eski bulgu: gol marketleri ridge≈20 istiyor), (b) λ_toplam' = L + γ(λ_toplam − L), oran λ_ev/λ_dep korunur, γ ve L (lig ortalaması, sızıntısız) sadece ayar döneminden.
-- Kabul: `health` son sınavında gol marketleri GEÇMELİ (eğim 0.85-1.15, |sapma| ≤ 1 puan), 1X2 kötüleşmemeli. Sağlanmazsa uygulanmaz.
-- Sonra Adım 3: 2026 gol artışı için lig gol seviyesine daha hızlı zaman ağırlığı (aynı çerçevede). Sonra kuponları Model/İkiz olarak ikiye bölmek ve kupon şartında referansı Bet365/DK yapmak.
-- Son faz (v3): canlı bildirim (roadmap Aşama 7).
+## 7. Sıradaki İş
+**Adım 3: 2026 gol seviyesi kayması** (onaylandı, başlanmadı):
+- Hipotez: lig gol seviyesi (mu) ve belki ev avantajı, takım güçlerinden daha hızlı değişiyor; mu için ayrı/daha kısa zaman ağırlığı (ör. lig ortalaması için ayrı xi veya lig seviyesine son N haftalık sızıntısız düzeltme).
+- Kabul: aynı `health` son sınavı; Üst 2.5/3.5 sapması ≤1 puan, eğimler ve 1X2 bozulmamalı; 2024/25'te zaten doğru olan seviyeyi bozmamalı (yıl kırılımı).
+- Seçim sadece ayar döneminden; dikkat: 2026 benzeri bir kayma ayar döneminde yoksa seçim zor, dürüstçe raporla.
+- Sonra: kuponları Model/İkiz olarak ikiye bölmek ve kupon şartında referansı Bet365/DK yapmak. Son faz (v3): canlı bildirim (roadmap Aşama 7).
+- Not: 01.11 tahminleri/kuponları eski modelle (ridge 5) üretildi; 02.11 07:30 update'ten itibaren yeni model.

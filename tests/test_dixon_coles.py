@@ -41,6 +41,11 @@ def test_gradient_matches_numeric():
     f = lambda x: dixon_coles.neg_log_likelihood(x, hi, ai, hg, ag, w, n, prior, prior, 1.0)[0]
     g = lambda x: dixon_coles.neg_log_likelihood(x, hi, ai, hg, ag, w, n, prior, prior, 1.0)[1]
     assert check_grad(f, g, x0) < 1e-3
+    f = lambda x: dixon_coles.neg_log_likelihood(x, hi, ai, hg, ag, w, n, prior, prior, 1.0, 7.0)[0]
+    g = lambda x: dixon_coles.neg_log_likelihood(x, hi, ai, hg, ag, w, n, prior, prior, 1.0, 7.0)[1]
+    assert check_grad(f, g, x0) < 1e-3
+    same = dixon_coles.neg_log_likelihood(x0, hi, ai, hg, ag, w, n, prior, prior, 3.0, 3.0)[0]
+    assert np.isclose(same, dixon_coles.neg_log_likelihood(x0, hi, ai, hg, ag, w, n, prior, prior, 3.0)[0])
 
 
 def test_fit_recovers_team_order_and_home_advantage():

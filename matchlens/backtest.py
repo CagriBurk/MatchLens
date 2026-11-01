@@ -14,7 +14,7 @@ MAX_ODDS = 6.0
 EPS = 1e-12
 
 
-def walk_forward(matches, start, xi, ridge, targets=("home_goals", "away_goals"), fixed_rho=None):
+def walk_forward(matches, start, xi, ridge, targets=("home_goals", "away_goals"), fixed_rho=None, ridge_style=dixon_coles.RIDGE_STYLE):
     rows = []
     for league, league_matches in matches.groupby("league"):
         played = finished(league_matches)
@@ -23,7 +23,8 @@ def walk_forward(matches, start, xi, ridge, targets=("home_goals", "away_goals")
         for week_start, week in test.groupby(test["kickoff"].dt.to_period("W-MON").dt.start_time):
             ref = pd.Timestamp(week_start, tz="UTC")
             try:
-                model = dixon_coles.fit(played, ref, xi=xi, ridge=ridge, warm_start=model, targets=targets, fixed_rho=fixed_rho)
+                model = dixon_coles.fit(played, ref, xi=xi, ridge=ridge, warm_start=model, targets=targets,
+                                        fixed_rho=fixed_rho, ridge_style=ridge_style)
             except ValueError:
                 continue
             for match in week.itertuples():
@@ -125,9 +126,9 @@ def betting_report(df, thresholds=EV_THRESHOLDS):
     return pd.DataFrame(rows), bets
 
 
-def run(leagues, start, xi, ridge, save=True):
+def run(leagues, start, xi, ridge, save=True, ridge_style=dixon_coles.RIDGE_STYLE):
     matches = load_matches(leagues)
-    preds = add_market_probs(walk_forward(matches, start, xi, ridge))
+    preds = add_market_probs(walk_forward(matches, start, xi, ridge, ridge_style=ridge_style))
     try:
         preds = preds.merge(load_odds(), on="event_id", how="left")
     except Exception:
@@ -155,8 +156,9 @@ def main():
     parser.add_argument("--start", default=DEFAULT_START)
     parser.add_argument("--xi", type=float, default=dixon_coles.XI)
     parser.add_argument("--ridge", type=float, default=dixon_coles.RIDGE)
+    parser.add_argument("--ridge-style", type=float, default=dixon_coles.RIDGE_STYLE)
     args = parser.parse_args()
-    print_reports(run(args.leagues, args.start, args.xi, args.ridge))
+    print_reports(run(args.leagues, args.start, args.xi, args.ridge, ridge_style=args.ridge_style))
 
 
 if __name__ == "__main__":
