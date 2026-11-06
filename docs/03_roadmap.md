@@ -163,6 +163,12 @@
 
 - **Karar (Çağrı, 2026-11-01 gece):** geliştirme duraklatıldı, veri toplama modu; `MatchLens.bat` ile günlük kullanım. ~2026-11-29'da `selection_log` üzerinden "İddaa > Bet365" (Kral Oran dahil) değerlendirmesi; kâr yoksa proje eğlence/bilgi aracı.
 
+## 📌 Geliştirme Aracı: Graphify Kod Haritası (2026-11-06)
+- [x] `graphifyy` 0.9.103 `uv tool` ile kuruldu (projenin `.venv`'inden ayrı). Sadece kod modu: yerel AST, LLM yok. İlk harita 67 dosya, 539 düğüm, 1803 bağlantı. Çıktı `graphify-out/` gitignore'da, yerelde yeniden üretilir (`graphify extract . --code-only`).
+- [x] `CLAUDE.md` eklendi: graphify kuralları + `@.agents/AGENTS.md` (proje kuralları her oturumda otomatik yüklenir). Skill `.claude/skills/graphify/` altında.
+- **Bilinen sınır:** modül seviyesindeki kodun çağrıları haritada yok (`ui/app.py`, `ui/pages/*`, `scripts/research/twin_lab.py`). `market_probs` testinde 14 çağıran yerden 13'ü bulundu; isim veya imza değişikliğinden önce grep ile doğrulanır.
+- **Karar (Çağrı):** Claude hook'ları kurulmadı. Git hook'unu (`graphify hook install`) Çağrı kendisi kuracak; kurulana kadar commit sonrası hatırlatılır. Dokümanlar şimdilik haritaya eklenmedi (kullanım hakkı harcıyor, sık değişen dosyalarla çabuk eskiyor).
+
 ## 📌 Aşama 7 (v3, son faz): Canlı Bildirim
 - Fikir (Çağrı): maç sırasında (örn. 15. dk, favori ev sahibi baskıda, takım 15-30 arasında çok gol atıyor) "oynanabilir" bildirimi.
 - Parçalar: takım bazlı 15 dk gol dağılımı (ESPN gol dakikaları, lig ortalamasına çekilmiş), canlı skor/dakika ve şut (ESPN, 30-60 sn gecikme; tehlikeli atak verisi yok), kalan süre + skor durumlu canlı Poisson, Nesine canlı oranı (incelenmedi), Telegram/Windows bildirimi.

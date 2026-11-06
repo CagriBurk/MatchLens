@@ -13,3 +13,4 @@ data/
 database/*.db
 _trash/
 .agents/skills/
+graphify-out/
