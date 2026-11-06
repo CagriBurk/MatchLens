@@ -1,5 +1,7 @@
 @.agents/AGENTS.md
 
+At the start of a new session, read docs/07_session_handoff.md before doing anything else.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.

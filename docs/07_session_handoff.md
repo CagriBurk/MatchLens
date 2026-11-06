@@ -4,6 +4,7 @@ Yeni oturum önce bunu, sonra `docs/03_roadmap.md` (Aşama 4-5a ve 7) ve `.agent
 
 ## 1. Çalışma Düzeni
 - Kararları Çağrı ile birlikte alıyoruz, kodu Claude yazıyor. Konuşma dili Türkçe, hızlı ilerleme.
+- Sade anlat: istatistik jargonu yerine "model %40 diyor, gerçekte %43 çıkıyor" gibi düz cümleler. Kötü bir şey varsa açıkça söyle, takıldığın yerde sor.
 - Kod stili: string/print/log İngilizce (istisna: `ui/` altındaki kullanıcı metinleri Türkçe), yorum satırı yok, minimal çıktı. Yollar `data_pipeline/config.py`, DB `data_pipeline/db.py`.
 - Büyük indirmelerden önce boyut söylenip onay alınır. Commit'i Claude atar, push'u Çağrı yapar.
 - **Model ilkesi (Çağrı):** model "üst çıksın" diye değil, gerçeğe uysun diye ayarlanır. Her model değişikliği `matchlens.health` raporunun son sınav dönemiyle kabul/ret edilir.
