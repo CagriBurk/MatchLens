@@ -146,12 +146,3 @@ def save(table):
         conn.executemany("INSERT OR REPLACE INTO nesine_odds (event_id, code, key, odds, mbs, fetched_at, fair) VALUES (?, ?, ?, ?, ?, ?, ?)",
                          table[["event_id", "code", "key", "odds", "mbs", "fetched_at", "fair"]].itertuples(index=False, name=None))
     return len(table)
-
-
-def load(event_ids=None):
-    with connect() as conn:
-        exists = conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'nesine_odds'").fetchone()
-        if not exists:
-            return pd.DataFrame(columns=["event_id", "code", "key", "odds", "mbs", "fetched_at", "fair"])
-        table = pd.read_sql_query("SELECT * FROM nesine_odds", conn, dtype={"event_id": str})
-    return table if event_ids is None else table[table["event_id"].isin(set(map(str, event_ids)))]

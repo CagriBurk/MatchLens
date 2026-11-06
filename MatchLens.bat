@@ -2,11 +2,9 @@
 cd /d "%~dp0"
 set PYTHONUTF8=1
 
-findstr /C:"=== %date%" data\logs\update.log >nul 2>&1
-if errorlevel 1 (
-    echo No update today yet, running it now. This takes a few minutes...
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\daily_update.ps1
-)
+echo Checking today's update. If it has not finished yet this takes a few minutes, keep this window open...
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\daily_update.ps1
+if errorlevel 1 echo Update failed, it will retry within the hour. Details: data\logs\update.log
 
 echo.
 echo Last update log:

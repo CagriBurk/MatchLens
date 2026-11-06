@@ -1,5 +1,5 @@
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 import pandas as pd
 
@@ -10,24 +10,30 @@ from matchlens import bulletin, coupons, tracking, twins
 from matchlens.data import load_matches
 
 LOG_DAYS = 3
+NIGHT_END = time(7, 30)
+
+
+def day_fixtures(records, today):
+    kickoff = pd.to_datetime(records["kickoff_utc"], utc=True).dt.tz_convert(bulletin.LOCAL_TZ)
+    end = pd.Timestamp(datetime.combine(today + timedelta(days=1), NIGHT_END), tz=bulletin.LOCAL_TZ)
+    return records[kickoff < end]
 
 
 def run_coupons(records, today, settled_legs, force=False):
     if records.empty:
-        return
+        return True
     try:
         offers, matched = nesine.odds_for(records)
     except Exception as error:
         print(f"nesine fetch failed: {error}")
-        offers, matched = nesine.load(records["event_id"]), None
-    else:
-        nesine.save(offers)
-        print(f"nesine: matched {len(matched)} of {len(records)} fixtures, {len(offers)} odds")
-    local_day = pd.to_datetime(records["kickoff_utc"], utc=True).dt.tz_convert(bulletin.LOCAL_TZ).dt.date
-    todays = records[local_day.eq(today)]
+        return False
+    nesine.save(offers)
+    print(f"nesine: matched {len(matched)} of {len(records)} fixtures, {len(offers)} odds")
+    todays = day_fixtures(records, today)
     made = coupons.generate(today, todays, offers, force=force)
     picks = coupons.log_selections(today, todays, offers, force=force)
     print(f"coupons: settled {settled_legs[0]} legs and {settled_legs[1]} selections, wrote {made} legs and {picks} selections for {today}")
+    return True
 
 
 def run(leagues, days, workers, force_coupons=False):
@@ -48,16 +54,17 @@ def run(leagues, days, workers, force_coupons=False):
     logged = tracking.log_predictions(records, candidates)
     bulletin.save_snapshots(records, candidates)
     print(f"settled {settled} predictions, logged {logged} predictions for {len(records)} fixtures")
-    run_coupons(records, today, settled_legs, force_coupons)
+    coupons_written = run_coupons(records, today, settled_legs, force_coupons)
 
     accuracy, betting = tracking.report()
-    if accuracy is None:
-        return
-    with pd.option_context("display.width", 200):
-        print(accuracy.round(3).to_string())
-        if len(betting):
-            print(f"Bets with EV > {tracking.MIN_EV:.0%}")
-            print(betting.round(3).to_string())
+    if accuracy is not None:
+        with pd.option_context("display.width", 200):
+            print(accuracy.round(3).to_string())
+            if len(betting):
+                print(f"Bets with EV > {tracking.MIN_EV:.0%}")
+                print(betting.round(3).to_string())
+    if not coupons_written:
+        raise SystemExit("nesine odds unavailable, coupons and selections not written")
 
 
 def main():

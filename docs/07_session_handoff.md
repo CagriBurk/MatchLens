@@ -11,7 +11,7 @@ Yeni oturum önce bunu, sonra `docs/03_roadmap.md` (Aşama 4-5a ve 7) ve `.agent
 
 ## 2. Ortam (Windows)
 - `C:\Users\cbura\projects\MatchLens`, Python 3.14 `.venv`, `PYTHONUTF8=1`, `tzdata`. WSL kopyası sadece yedek.
-- Günlük: Görev Zamanlayıcı "MatchLens Daily Update" 07:30 → `scripts/daily_update.ps1` (mutex) → `python -m matchlens.update`, log `data/logs/update.log`. Update; ESPN, ikiz havuzu, bülten dosyaları (`data/bulletins/<tarih>_matches.csv`), `prediction_log`, Nesine oranları ve o günün kuponlarını üretir, bitmiş maçları sonuçlandırır.
+- Günlük: Görev Zamanlayıcı "MatchLens Daily Update" 07:30'dan 23:30'a saatte bir → `scripts/daily_update.ps1` (mutex; o gün başarılıysa `data/logs/last_success.txt` sayesinde hemen çıkar) → `python -m matchlens.update`, log `data/logs/update.log`. Update; ESPN, ikiz havuzu, bülten dosyaları (`data/bulletins/<tarih>_matches.csv`), `prediction_log`, Nesine oranları ve o günün kuponlarını üretir, bitmiş maçları sonuçlandırır. Seçim/kupon penceresi ertesi sabah 07:30'a kadardır (gece MLS maçları). Nesine çekilemezse seçim yazılmaz, güncelleme başarısız sayılır ve saat başı yeniden denenir. Bilgisayar kapalı/uykudaysa o saatler yine kaçar.
 - Arayüz: `powershell -File scripts\run_ui.ps1` → http://localhost:8501 (Streamlit; motor kodu değişince sunucuyu yeniden başlat).
 - Uzun hesaplar DB'ye yazarken update/UI ile çakıştırma (SQLite tek yazıcı).
 
@@ -33,7 +33,7 @@ Her maç için bağımsız kaynaklar yan yana (Bet365 oranı modele girmez):
 .venv\Scripts\python -m matchlens.health --label X --weights none|tune|saved   # sağlık raporu -> data/reports/
 .venv\Scripts\python -m matchlens.calibration
 .venv\Scripts\python -m data_pipeline.ingest_espn scoreboards|summaries|build|coverage [--incremental]
-.venv\Scripts\python -m pytest -q -p no:seleniumbase tests     # 97 test
+.venv\Scripts\python -m pytest -q -p no:seleniumbase tests     # 105 test
 powershell -File scripts\run_ui.ps1
 ```
 
@@ -51,6 +51,8 @@ powershell -File scripts\run_ui.ps1
 
 ## 7. Sıradaki İş
 **Veri toplama modu (Çağrı, 2026-11-01 gece):** İkiz laboratuvarı (roadmap) ve oran hareketi araştırması sonucunda ne model ne ikizler İddaa marjını (Kral Oran'la bile %12-16) aşacak avantaj göstermedi; proje bir süre geliştirilmeyecek, sadece veri toplanacak. Çağrı her sabah kök dizindeki `MatchLens.bat` ile açıyor (o gün update yoksa önce çalıştırır, sonra arayüzü başlatıp tarayıcıyı açar). Yeni ince ayar/özellik önerme. ~2026-11-29'da tek değerlendirme: `selection_log`'da "İddaa > Bet365" (Kral Oran = Nesine × 1.04, iddaa.com `sportsbookv2.iddaa.com/sportsbook/events?st=1&type=0&version=0`, `odd` kral / `wodd` normal) seçimleri yüzlerce sonuçta kâra geçiyor mu; geçmiyorsa proje eğlence/bilgi aracı olarak kesinleşir. Bekleyen küçük işler (Çağrı onaylarsa): ikiz k=1000 + piyasaya çekme, Karne'ye Kral Oran sütunu ve "İddaa > Bet365" kuralı, kuponlara beklenen kayıp.
+
+**Ara ölçüm (2026-11-06, roadmap "Veri Toplama Denetimi"):** `selection_log`'daki 1.002 seçimde (19 maç, 2 gün) oran × Bet365 adil olasılığı hiç 1'i geçmedi (medyan 0,82, en yüksek 0,954; Kral Oran × 1,04 ile de sıfır). Hafta sonu 07-08.11'deki ~107 maçtan sonra aynı sayımı tekrarla; hâlâ sıfıra yakınsa 29 Kasım'ı beklemeden Çağrı'ya bildir.
 
 
 **Model ayarı donduruldu (Çağrı, 2026-11-01):** split30 (güç 3 / stil 30) üretimde, ölçüt kalibrasyon. Akşam denenen sıkı log-loss kapısı, mevsimsellik ve gol seviyesi takipçisi binde bir kazanç verdi, kanıtlanamadı, geri alındı (git: 2361300, ebfacae). 2026 sonbahar gol artışı öngörülemez şok; Karne'den izlenecek.

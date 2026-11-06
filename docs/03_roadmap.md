@@ -163,6 +163,12 @@
 
 - **Karar (Çağrı, 2026-11-01 gece):** geliştirme duraklatıldı, veri toplama modu; `MatchLens.bat` ile günlük kullanım. ~2026-11-29'da `selection_log` üzerinden "İddaa > Bet365" (Kral Oran dahil) değerlendirmesi; kâr yoksa proje eğlence/bilgi aracı.
 
+## 📌 Veri Toplama Denetimi (2026-11-06)
+- **"Günde ~200 seçim" yanıltıcıymış:** 1.002 seçimin tamamı iki güne ait (02.11: 525, 06.11: 477; maç başına ~53). 02-06.11 arasındaki 39 maçın 19'u kaydedildi, 1'i Nesine'de yoktu, 19'u kaçtı. 03.11 çalışma hiç başlamadı (bilgisayar 12:06'dan itibaren açıktı, sebebi kesin değil, zamanlayıcı geçmişi kapalı), 04.11 ESPN hatasıyla öldü ve yeniden denenmedi, 05.11 `^C` ile kesildi (o gün maç yoktu). 02.11 çalışması 17:14'te olduğu için 6 maç başlamıştı.
+- **Sabit açıklar giderildi:** (1) Başarısız veya kesilen güncelleme artık saat başı yeniden denenir; eski `MatchLens.bat` kesik çalışmayı da "yapıldı" sayıyordu. (2) Gece maçları (00:00-07:30, 29.11'e kadar 23 MLS maçı, 15'i 08.11'de) hiçbir sabahın penceresine girmediği için seçim/kupona hiç yazılamıyordu; pencere ertesi sabah 07:30'a kadar uzatıldı. (3) Nesine çekilemezse eski oranlar seçim tablosuna yazılmıyor. (4) Çıktı arabelleksiz, kesilen çalışmanın logu kaybolmuyor.
+- **Düzelmeyen:** Bilgisayar 07:30'da kapalı/uykudaysa ilk açılıştan önce başlayan maçlar kaçar. `WakeToRun` açılmadı; dizüstünü kendiliğinden uyandıracağı için karar Çağrı'nın.
+- **"İddaa > Bet365" ara ölçümü:** Tanım: oran × Bet365 (yoksa DK) adil olasılığı > 1. 1.002 seçimde (19 maç) sıfır, Kral Oran × 1,04 ile de sıfır; medyan 0,82, en yüksek 0,954. Sadece doğrudan fiyatlı marketlerde ortalama 0,84, en yüksek 0,884. Örneklem küçük ve tek maçın seçimleri birbirine bağlı. Takvim: 07-29.11 arası 331 maç (milli ara nedeniyle 14-15.11'de 9 maç), hepsi yakalanırsa ~17.500 seçim. Bu oranda 29 Kasım'da "yüzlerce kazanan seçim" olması beklenmiyor; 08.11 sonrası tekrar ölçülecek.
+
 ## 📌 Geliştirme Aracı: Graphify Kod Haritası (2026-11-06)
 - [x] `graphifyy` 0.9.103 `uv tool` ile kuruldu (projenin `.venv`'inden ayrı). Sadece kod modu: yerel AST, LLM yok. İlk harita 67 dosya, 539 düğüm, 1803 bağlantı. Çıktı `graphify-out/` gitignore'da, yerelde yeniden üretilir (`graphify extract . --code-only`).
 - [x] `CLAUDE.md` eklendi: graphify kuralları + `@.agents/AGENTS.md` (proje kuralları her oturumda otomatik yüklenir). Skill `.claude/skills/graphify/` altında.
