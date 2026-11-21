@@ -9,6 +9,12 @@ It is a learning project, not a betting tool. Its main finding is a negative one
 model nor the twins beat the market, and no betting rule was profitable historically.
 Türkçe özet aşağıda.
 
+![Daily bulletin: model, odds twins and market side by side](images/bulletin.png)
+
+| Match detail: three sources on one scale | Forward scorecard: model vs twins vs market |
+|---|---|
+| ![Match detail](images/match.png) | ![Scorecard](images/scorecard.png) |
+
 ## How it works
 
 - **Goal model:** a Dixon-Coles model with two separate ridge penalties: one for team *strength*
