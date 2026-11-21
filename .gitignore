@@ -14,3 +14,11 @@ database/*.db
 _trash/
 .agents/skills/
 graphify-out/
+
+# Local working notes and editor/assistant settings
+.claude/
+.agents/
+CLAUDE.md
+docs/
+design.md
+.vscode/
